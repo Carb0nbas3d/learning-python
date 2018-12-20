@@ -417,6 +417,42 @@ class Spaceship(VectorSprite):
         self.image0 = self.image.copy()
         self.rect = self.image.get_rect()
         
+class EvilMonster(VectorSprite):
+    
+    def _overwrite_parameters(self):
+        self.rotdelta = 1
+        self.rot = 255
+        
+    
+    def create_image(self):
+        self.image = pygame.Surface((50,50))
+        pygame.draw.circle(self.image, (255, 255, 0), (25,25), 25)
+        pygame.draw.circle(self.image, (self.rot, 0, 0), (10,10), 10)
+        pygame.draw.circle(self.image, (self.rot, 0, 0), (40,10), 10)
+        self.image.set_colorkey((0,0,0))
+        self.image.convert_alpha()
+        self.rect = self.image.get_rect()
+        self.image0 = self.image.copy()
+        self.rot += self.rotdelta
+        if self.rot > 255:
+            self.rot = 255
+            self.rotdelta *= -1
+        if self.rot < 1:
+            self.rot = 1
+            self.rotdelta *= -1
+       
+    def update(self, seconds):
+        #---ai----
+        if random.random() < 0.01:
+            v = pygame.math.Vector2(1,0)
+            v.rotate_ip(random.randint(0,360))
+            v *= random.random()*50
+            self.move = v
+        VectorSprite.update(self, seconds)
+        oldcenter = self.rect.center
+        self.create_image() 
+        self.rect.center = oldcenter
+        self.set_angle(self.angle)
 
 
 class Smoke(VectorSprite):
@@ -559,6 +595,7 @@ class PygView(object):
         self.tracergroup = pygame.sprite.Group()
         self.mousegroup = pygame.sprite.Group()
         self.explosiongroup = pygame.sprite.Group()
+        EvilMonster.groups = self.allgroup
 
         Mouse.groups = self.allgroup, self.mousegroup
         
@@ -578,6 +615,9 @@ class PygView(object):
 
         self.player1 =  Spaceship(warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2,-PygView.height/2))
         self.player2 =  Spaceship(warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2+100,-PygView.height/2))
+        
+        for x in range(20):
+            EvilMonster(bounce_on_edge=True)
 
     def movement_indicator(self,vehicle,pygamepos, color=(0,200,0)):
 		#----heading indicator
@@ -759,3 +799,4 @@ class PygView(object):
 
 if __name__ == '__main__':
     PygView(1430,800).run() # try PygView(800,600).run()
+
