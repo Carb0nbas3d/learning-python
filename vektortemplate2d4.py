@@ -412,6 +412,7 @@ class Spaceship(VectorSprite):
     
     def _overwrite_parameters(self):
         self.mass =1000
+        self.mines = 10
     
     def create_image(self):
         self.image = pygame.Surface((50,50))
@@ -420,7 +421,7 @@ class Spaceship(VectorSprite):
         self.image.convert_alpha()
         self.image0 = self.image.copy()
         self.rect = self.image.get_rect()
-        
+      
         
 class EvilMonster(VectorSprite):
     
@@ -454,7 +455,7 @@ class EvilMonster(VectorSprite):
             v = pygame.math.Vector2(1,0)
             v.rotate_ip(random.randint(0,360))
             v *= random.random()*50
-            self.move = v
+            self.move += v
         VectorSprite.update(self, seconds)
         oldcenter = self.rect.center
         self.create_image() 
@@ -467,7 +468,7 @@ class Mine(VectorSprite):
         self.rotdelta = 10
         self.rot = 255
         self.mass=100
-        self.radius=25
+        self.radius=10
         
     
     def create_image(self):
@@ -490,8 +491,9 @@ class Mine(VectorSprite):
             self.rotdelta *= -1
             
     def update(self, seconds):
-        VectorSprite.update(self, seconds)
         self.create_image()
+        VectorSprite.update(self, seconds)
+        
 
 class Smoke(VectorSprite):
 
@@ -657,9 +659,9 @@ class PygView(object):
         self.player1 =  Spaceship(warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2,-PygView.height/2))
         self.player2 =  Spaceship(warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2+100,-PygView.height/2))
         
-        Mine(pos=pygame.math.Vector2(500,-500))
-        for x in range(5):
-            EvilMonster(bounce_on_edge=True)
+        Mine(pos=pygame.math.Vector2(500,-300))
+        for x in range(20):
+            EvilMonster( bounce_on_edge=True)
 
     def movement_indicator(self,vehicle,pygamepos, color=(0,200,0)):
         #----heading indicator
@@ -746,7 +748,9 @@ class PygView(object):
                         Rocket(pos=p+t, move=v, angle=a)
                     # ------ mine laying for player 1 ------    
                     if event.key == pygame.K_c:
-                        Mine(pos=pygame.math.Vector2(self.player1.pos.x, self.player1.pos.y))
+                        if self.player1.mines>0:
+                            Mine(pos=pygame.math.Vector2(self.player1.pos.x, self.player1.pos.y))
+                            self.player1.mines-=1
                         print("mine at ", self.player1.pos)
                     # PygView.width/2, PygView.height/2,  "set_angle: 135°", color=(255,0,0), duration = 3, fontsize=20)
                     # ---- stop movement for self.player1 -----
@@ -865,6 +869,15 @@ class PygView(object):
                 for m2 in crashgroup:
                     if m.number < m2.number:
                         elastic_collision(m, m2)
+            #----------collosion detection between monster and mine----------
+            for mi in self.minegroup:
+                crashgroup = pygame.sprite.spritecollide(mi, self.monstergroup,
+                             False, pygame.sprite.collide_circle)
+                for mo in crashgroup:
+                    diffvector = mo.pos - mi.pos
+                    diffvector.normalize_ip()
+                    print("diffvec", diffvector)
+                    mo.move = diffvector * 500
             # ----------- clear, draw , update, flip -----------------
             self.allgroup.draw(self.screen)
 
