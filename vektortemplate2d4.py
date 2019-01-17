@@ -493,7 +493,18 @@ class Mine(VectorSprite):
     def update(self, seconds):
         self.create_image()
         VectorSprite.update(self, seconds)
-        
+
+class Sparks(VectorSprite):
+    
+    def create_image(self):
+        self.image=pygame.Surface((10,5))
+        pygame.draw.line(self.image, self.color, (0, random.randint(0,3)),(random.randint(1,10),3),random.randint(1,3))
+        self.image.set_colorkey((0,0,0))
+        self.image.convert_alpha()
+        self.rect = self.image.get_rect()
+        self.image0 = self.image.copy()
+
+    
 
 class Smoke(VectorSprite):
 
@@ -659,7 +670,7 @@ class PygView(object):
         self.player1 =  Spaceship(warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2,-PygView.height/2))
         self.player2 =  Spaceship(warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2+100,-PygView.height/2))
         
-        Mine(pos=pygame.math.Vector2(500,-300))
+        #Mine(pos=pygame.math.Vector2(500,-300))
         for x in range(20):
             EvilMonster( bounce_on_edge=True)
 
@@ -751,7 +762,7 @@ class PygView(object):
                         if self.player1.mines>0:
                             Mine(pos=pygame.math.Vector2(self.player1.pos.x, self.player1.pos.y))
                             self.player1.mines-=1
-                        print("mine at ", self.player1.pos)
+                        #print("mine at ", self.player1.pos)
                     # PygView.width/2, PygView.height/2,  "set_angle: 135°", color=(255,0,0), duration = 3, fontsize=20)
                     # ---- stop movement for self.player1 -----
                     if event.key == pygame.K_r:
@@ -876,7 +887,7 @@ class PygView(object):
                 for mo in crashgroup:
                     diffvector = mo.pos - mi.pos
                     diffvector.normalize_ip()
-                    print("diffvec", diffvector)
+                    #print("diffvec", diffvector)
                     mo.move = diffvector * 500
             # ----------- clear, draw , update, flip -----------------
             self.allgroup.draw(self.screen)
