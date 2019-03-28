@@ -202,12 +202,12 @@ class Mouse(pygame.sprite.Sprite):
             pass
         if self.x < 0:
             self.x = 0
-        elif self.x > PygView.width:
-            self.x = PygView.width
+        elif self.x > Viewer.width:
+            self.x = Viewer.width
         if self.y < 0:
             self.y = 0
-        elif self.y > PygView.height:
-            self.y = PygView.height
+        elif self.y > Viewer.height:
+            self.y = Viewer.height
         self.tail.insert(0,(self.x,self.y))
         self.tail = self.tail[:128]
         self.rect.center = self.x, self.y
@@ -255,7 +255,7 @@ class VectorSprite(pygame.sprite.Sprite):
         if "static" not in kwargs:
             self.static = False
         if "pos" not in kwargs:
-            self.pos = pygame.math.Vector2(random.randint(0, PygView.width),-50)
+            self.pos = pygame.math.Vector2(random.randint(0, Viewer.width),-50)
         if "move" not in kwargs:
             self.move = pygame.math.Vector2(0,0)
         if "radius" not in kwargs:
@@ -378,7 +378,7 @@ class VectorSprite(pygame.sprite.Sprite):
                 self.pos.x = 0
                 self.move.x *= -1
             elif self.warp_on_edge:
-                self.pos.x = PygView.width 
+                self.pos.x = Viewer.width 
         # -------- upper edge -----
         if self.pos.y  > 0:
             if self.kill_on_edge:
@@ -387,36 +387,56 @@ class VectorSprite(pygame.sprite.Sprite):
                 self.pos.y = 0
                 self.move.y *= -1
             elif self.warp_on_edge:
-                self.pos.y = -PygView.height
+                self.pos.y = -Viewer.height
         # -------- right edge -----                
-        if self.pos.x  > PygView.width:
+        if self.pos.x  > Viewer.width:
             if self.kill_on_edge:
                 self.kill()
             elif self.bounce_on_edge:
-                self.pos.x = PygView.width
+                self.pos.x = Viewer.width
                 self.move.x *= -1
             elif self.warp_on_edge:
                 self.pos.x = 0
         # --------- lower edge ------------
-        if self.pos.y   < -PygView.height:
+        if self.pos.y   < -Viewer.height:
             if self.kill_on_edge:
                 self.hitpoints = 0
                 self.kill()
             elif self.bounce_on_edge:
-                self.pos.y = -PygView.height
+                self.pos.y = -Viewer.height
                 self.move.y *= -1
             elif self.warp_on_edge:
                 self.pos.y = 0
 
-class Spaceship(VectorSprite):
+class Player(VectorSprite):
     
     def _overwrite_parameters(self):
         self.mass =1000
+        self.points =0
         self.mines = 10
+        self.firemode = "single" #"shotgun" "machine gun"
+        self.shotgunangle = 30
+        self.effect_shots_per_shotgun = 0
+        self.effect_shots_per_single_shot = 1
         if self.number == 0:
             self.color = (0,0,255)
         if self.number == 1:
             self.color = (255,0,0)
+        self.speed = 1
+        self.hitpoints = 100
+        self.rammer = 0
+        self.radius=25
+        self.heat=0
+        self.cool=5
+        self.overheat=100
+        self.heatpenalty=2.5
+        self.triggerhappytime = 0
+        self.machinegun = 0
+    
+    def kill(self):
+        Explosion(pos=self.pos,)
+        VectorSprite.kill(self)
+        
     
     def create_image(self):
         self.image = pygame.Surface((50,50))
@@ -426,56 +446,133 @@ class Spaceship(VectorSprite):
         self.image0 = self.image.copy()
         self.rect = self.image.get_rect()
         
+    def update(self, seconds):
+        VectorSprite.update(self, seconds)
+        if self.heat > self.overheat:
+            self.triggerhappytime = self.age + self.heatpenalty
+        self.heat -= self.cool* seconds
+        self.heat = max(0, self.heat)
+        
     def fire(self):
-        v = pygame.math.Vector2(100,0)
-        v.rotate_ip(self.angle)
-        v+=self.move
         p = pygame.math.Vector2(self.pos.x, self.pos.y)
-        a=self.angle
-        t=pygame.math.Vector2(25,0)
+        t=pygame.math.Vector2(25,0) #cannon muzzle
         t.rotate_ip(self.angle)
-        Rocket(pos=p+t, move=v, angle=a, bossnumber=self.number, color=self.color)
-
+        if self.firemode == "single":
+            v = pygame.math.Vector2(100,0)
+            v.rotate_ip(self.angle)
+            v+=self.move
+            a=self.angle
+            for nr in range(self.effect_shots_per_single_shot):   
+                Rocket(pos=p+t, move=v*(nr+1) , angle=a, bossnumber=self.number, color=self.color)
+                
+        elif self.firemode == "shotgun":
+            angles = []
+            d = self.shotgunangle  / (self.effect_shots_per_shotgun + 1)
+            start = -self.shotgunangle / 2
+            point = start + d
+            while point < self.shotgunangle / 2:
+                angles.append(point)
+                point += d
+            for point in angles:
+                v = pygame.math.Vector2(100,0)
+                v.rotate_ip(self.angle+point)
+                v += self.move
+                a = self.angle + point
+                Rocket(pos=p+t, move=v, angle=a, bossnumber=self.number, color=self.color)
+        
+        elif self.firemode == "machine gun":
+            # overheating?
+            if self.age < self.triggerhappytime:
+                #print(" gun to hot, sorry")
+                return
+            
+            self.heat += 2
+            
+            v = pygame.math.Vector2(100,0)
+            v.rotate_ip(self.angle)
+            v+=self.move
+            a=self.angle   
+            Rocket(pos=p+t, move=v , angle=a, bossnumber=self.number, color=self.color)
+                
+            
         
 class EvilMonster(VectorSprite):
     
     def _overwrite_parameters(self):
-        self.rotdelta = 1
-        self.rot = 255
-        self.mass=100
+        self.reddelta = 10
+        self.red = 255
+        self.mass=1000
         self.radius=25
         self.bounce_on_edge=True
+        self.flee = False
     
     def create_image(self):
         self.image = pygame.Surface((50,50))
         pygame.draw.circle(self.image, (255, 255, 0), (25,25), 25)
-        pygame.draw.circle(self.image, (self.rot, 0, 0), (10,10), 10)
-        pygame.draw.circle(self.image, (self.rot, 0, 0), (40,10), 10)
+        pygame.draw.circle(self.image, (self.red, 0, 0), (10,10), 10)
+        pygame.draw.circle(self.image, (self.red, 0, 0), (40,10), 10)
         self.image.set_colorkey((0,0,0))
         self.image.convert_alpha()
         self.rect = self.image.get_rect()
         self.image0 = self.image.copy()
-        self.rot += self.rotdelta
-        if self.rot > 255:
-            self.rot = 255
-            self.rotdelta *= -1
-        if self.rot < 1:
-            self.rot = 1
-            self.rotdelta *= -1
+        self.red += self.reddelta
+        if self.red > 255:
+            self.red = 255
+            self.reddelta *= -1
+        if self.red < 1:
+            self.red = 1
+            self.reddelta *= -1
+        self.army = 5
        
     def update(self, seconds):
-        #---ai----
-        if random.random() < 0.01:
-            v = pygame.math.Vector2(1,0)
-            v.rotate_ip(random.randint(0,360))
-            v *= random.random()*50
-            self.move += v
+        self.ai() #---ai----
         VectorSprite.update(self, seconds)
         oldcenter = self.rect.center
         self.create_image() 
         self.rect.center = oldcenter
         self.set_angle(self.angle)
-       
+    
+    def ai(self):
+        # fly toward closest player ( number 0 and 1 ) 
+        targets = []
+        for n in (0,1):
+            if n in VectorSprite.numbers:
+                targets.append(VectorSprite.numbers[n])
+        if len(targets) == 0:
+            if random.random() < 0.01:
+                v = pygame.math.Vector2(1,0)
+                v.rotate_ip(random.randint(0,360))
+                v *= random.random()*50
+                self.move += v
+            return
+        # select target to move to
+        #t = random.choice(targets)
+        # calculate closest distance
+        self.closest = None
+        bestdist = None
+        self.diff = None
+        for t in targets:
+            diff = self.pos - t.pos
+            distance = diff.length()
+            if (bestdist is None) or (distance < bestdist):
+                bestdist = distance
+                self.closest = t
+                self.diff = diff
+        # move toward closest
+        if self.move.length() < 1: 
+            self.move = pygame.math.Vector2(50,0) # rightvector
+        # angle from rightvector to monster's diffvector
+        # flee from t if rammer > 10
+        if self.closest.rammer > 10:
+            self.flee = True
+        else: 
+            self.flee = False
+        a = self.move.angle_to((1 if self.flee else -1) * self.diff)
+        self.move.rotate_ip(a)
+                
+               
+             
+         
     def kill(self):
         Explosion(pos=self.pos,fragments=100, color=(128, 0, 128),max_age=2.5)
         VectorSprite.kill(self)   
@@ -488,31 +585,33 @@ class Levelboss(EvilMonster):
         self.mass = 5000
         self.hitpoints = 50
 
+
     def create_image(self):
         self.image = pygame.Surface((80,80))
         pygame.draw.circle(self.image, (255, 255, 0), (40,40), 40)
-        pygame.draw.circle(self.image, (self.rot, 0, 0), (10,10), 10)
-        pygame.draw.circle(self.image, (self.rot, 0, 0), (70,10), 10)
+        pygame.draw.circle(self.image, (self.red, 0, 0), (10,10), 10)
+        pygame.draw.circle(self.image, (self.red, 0, 0), (70,10), 10)
         self.image.set_colorkey((0,0,0))
         self.image.convert_alpha()
         self.rect = self.image.get_rect()
         self.image0 = self.image.copy()
-        self.rot += self.rotdelta
-        if self.rot > 255:
-            self.rot = 255
-            self.rotdelta *= -1
-        if self.rot < 1:
-            self.rot = 1
-            self.rotdelta *= -1
+        self.red += self.reddelta
+        if self.red > 255:
+            self.red = 255
+            self.reddelta *= -1
+        if self.red < 1:
+            self.red = 1
+            self.reddelta *= -1
 
 
 class Powerup(VectorSprite):
     
     
     def _overwrite_parameters(self):
-        x=random.randint(0,PygView.width)
-        y=random.randint(0,PygView.height)
+        x=random.randint(0,Viewer.width)
+        y=random.randint(0,Viewer.height)
         self.pos=pygame.math.Vector2(x,-y)
+        self.radius = 15
     
     def create_image(self):
         self.image=pygame.Surface((30,30))
@@ -531,8 +630,8 @@ class Powerup(VectorSprite):
 class Mine(VectorSprite):    
     
     def _overwrite_parameters(self):
-        self.rotdelta = 10
-        self.rot = 255
+        self.reddelta = 10
+        self.red = 255
         self.mass=100
         self.radius=10
         
@@ -542,19 +641,19 @@ class Mine(VectorSprite):
         # umfang 
         pygame.draw.circle(self.image, (1,1,1), (10,10), 10)
         # auge
-        pygame.draw.circle(self.image, (self.rot, 0, 0), (10,10), 5)
-        #pygame.draw.circle(self.image, (self.rot, 0, 0), (40,10), 10)
+        pygame.draw.circle(self.image, (self.red, 0, 0), (10,10), 5)
+        #pygame.draw.circle(self.image, (self.red, 0, 0), (40,10), 10)
         self.image.set_colorkey((0,0,0))
         self.image.convert_alpha()
         self.rect = self.image.get_rect()
         self.image0 = self.image.copy()
-        self.rot += self.rotdelta
-        if self.rot > 255:
-            self.rot = 255
-            self.rotdelta *= -1
-        if self.rot < 1:
-            self.rot = 1
-            self.rotdelta *= -1
+        self.red += self.reddelta
+        if self.red > 255:
+            self.red = 255
+            self.reddelta *= -1
+        if self.red < 1:
+            self.red = 1
+            self.reddelta *= -1
             
     def update(self, seconds):
         self.create_image()
@@ -624,7 +723,22 @@ class Smoke(VectorSprite):
         c = min(255,c)
         self.color=(c,c,c)
 
-
+class Game():
+    
+    
+    mainitems = ["exit", "upgrade player1","upgrade player2", "options", "credits"]
+    menuindex = 0
+    upgradeitems = ["back", "single button", "shotgun","shotgun dispersal", "machine gun","MG tolerance","MG cooling system","rocket", "sniper",
+                    "mines", "speed", "HP","rammer", "lockdown", "escape pod", "invisibility",
+                    "astromech"]
+    creditmenu = ["Artworks and Creative","Samuel Wetter","Advising","Horst Jens","code by ", "Horst Jens and", "Samuel Wetter"]
+    optionmenu = ["back","resolution"]
+    resmenu=[]
+    #menu =  { "upgrade": ["upgrade rockets", "upgbrade shield", "...."],
+            #   "downgrade": [ ... ] ,
+             # }
+    
+    
 class Explosion():
     
     def __init__(self,pos,fragments=15,color=(255,0,0),startangle=0,endangle=360, max_age=0.5):
@@ -643,7 +757,9 @@ class Rocket(VectorSprite):
 
     def _overwrite_parameters(self):
         self._layer = 1
-        self.kill_on_edge=True    
+        self.kill_on_edge=True 
+        self.max_age=5   
+        self.mass=1
 
     def create_image(self):
         self.image = pygame.Surface((10,5))
@@ -654,23 +770,105 @@ class Rocket(VectorSprite):
         self.image0 = self.image.copy()
         self.rect = self.image.get_rect()
 
+class Missile(VectorSprite):
+    
+    def _overwrite_parameters(self):
+        self.damage = 10
+        boss = VectorSprite.numbers[self.bossnumber]
+        self.color = boss.color
+        self.pos = pygame.math.Vector2(boss.pos.x,boss.pos.y)
+        self.move = pygame.math.Vector2(boss.move.x, boss.move.y)
+        self.angle = boss.angle
+        self.speed = 15
+        self.target_selection()
+    
+    def create_image(self):
+        self.image = pygame.Surface((30,10))
+        pygame.draw.polygon(self.image, (self.color),[(0,0),(20,0),(30,5),(20,10),(0,10)])
+        self.image.set_colorkey((0,0,0))
+        self.image.convert_alpha()
+        self.image0 = self.image.copy()
+        self.rect = self.image.get_rect()
 
-class PygView(object):
+    def update(self, seconds):
+        # lebt target noch?
+        if self.target_number not in VectorSprite.numbers:
+            self.target_selection()
+            return
+        # diffvector zum target
+        diff =  self.target.pos - self.pos
+        try:
+            diff.normalize_ip() # make length 1
+        except:
+            return 
+        diff *= self.speed
+        self.move = diff
+        self.set_angle(self.move.angle_to(pygame.math.Vector2(1,0)))
+        
+        
+        
+        
+        VectorSprite.update(self, seconds)
+
+    def target_selection(self):
+        # fly toward closest enemy 
+        targets = []
+        for n in VectorSprite.numbers:
+            if VectorSprite.numbers[n].__class__.__name__ in ["EvilMonster", "Levelboss"]:
+                targets.append(VectorSprite.numbers[n])
+        if len(targets) == 0:
+            self.hitpoints = 0
+
+            return
+        # ---- search closest guy in targets ------
+        self.closest = None
+        bestdist = None
+        self.diff = None
+        for t in targets:
+            diff = self.pos - t.pos
+            distance = diff.length()
+            if (bestdist is None) or (distance < bestdist):
+                bestdist = distance
+                self.closest = t
+                self.diff = diff
+                self.target_number = self.closest.number
+                self.target = self.closest
+        
+        
+        
+class Viewer(object):
     width = 0
     height = 0
+    fullscreen=False
 
     def __init__(self, width=640, height=400, fps=30):
         """Initialize pygame, window, background, font,...
            default arguments """
         pygame.init()
-        PygView.width = width    # make global readable
-        PygView.height = height
+        Viewer.width = width    # make global readable
+        Viewer.height = height
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
         self.background = pygame.Surface(self.screen.get_size()).convert()
         self.background.fill((255,255,255)) # fill background white
         self.clock = pygame.time.Clock()
+        self.menuduration = 0
+        self.menu = False
         self.fps = fps
         self.playtime = 0.0
+        self.enemies=1
+        self.bosses=0
+        # ---- resmenu ----
+        li = ["back"]
+        for i in pygame.display.list_modes():
+            # li is something like "(800, 600)"
+            pair = str(i)
+            comma = pair.find(",")
+            x = pair[1:comma]
+            y = pair[comma+2:-1]
+            li.append(str(x)+"x"+str(y))
+        Game.resmenu = li
+        self.set_resolution()
+        
         # ------ background images ------
         self.backgroundfilenames = [] # every .jpg file in folder 'data'
         try:
@@ -681,13 +879,16 @@ class PygView(object):
             random.shuffle(self.backgroundfilenames) # remix sort order
         except:
             print("no folder 'data' or no jpg files in it")
+        
+        print(self.backgroundfilenames)
+            
         #if len(self.backgroundfilenames) == 0:
         #    print("Error: no .jpg files found")
         #    pygame.quit
         #    sys.exit()
-        PygView.bombchance = 0.015
-        PygView.rocketchance = 0.001
-        PygView.wave = 0
+        Viewer.bombchance = 0.015
+        Viewer.rocketchance = 0.001
+        Viewer.wave = 0
         self.age = 0
         # ------ joysticks ----
         pygame.joystick.init()
@@ -696,19 +897,41 @@ class PygView(object):
             j.init()
         self.paint()
         self.loadbackground()
+        Game.menuitems = Game.mainitems[:] # make a copy
+        self.activeplayer = self.player1
+    
+    def next_wave(self):
+        self.enemies*=2
+        self.bosses*=2
+        self.generate_enemies()
+
+    def set_resolution(self):
+        if Viewer.fullscreen:
+             self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF|pygame.FULLSCREEN)
+        else:
+             self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
+        self.loadbackground()
+    
+
 
     def loadbackground(self):
         
         try:
+            mypicname = random.choice(self.backgroundfilenames)
+            print("selecting: ", mypicname)
             self.background = pygame.image.load(os.path.join("data",
-                 self.backgroundfilenames[PygView.wave %
-                 len(self.backgroundfilenames)]))
+                 mypicname))
         except:
             self.background = pygame.Surface(self.screen.get_size()).convert()
             self.background.fill((255,255,255)) # fill background white
             
         self.background = pygame.transform.scale(self.background,
-                          (PygView.width,PygView.height))
+                          (Viewer.width,Viewer.height))
+        # kill bg
+        self.background = pygame.Surface(self.screen.get_size()).convert()
+        self.background.fill((255,255,255)) # fill background white
+            
+        
         self.background.convert()
         
 
@@ -724,19 +947,21 @@ class PygView(object):
         self.minegroup = pygame.sprite.Group()
         self.fireballgroup = pygame.sprite.Group()
         self.powerupgroup = pygame.sprite.Group()
+        self.flytextgroup = pygame.sprite.Group()
+        self.missilegroup = pygame.sprite.Group()
         
         EvilMonster.groups = self.allgroup
-        Spaceship.groups = self.allgroup, self.playergroup
+        Player.groups = self.allgroup, self.playergroup
         #Mouse.groups = self.allgroup, self.mousegroup
         Mine.groups= self.allgroup, self.minegroup
         VectorSprite.groups = self.allgroup
-        Flytext.groups = self.allgroup
+        Flytext.groups = self.allgroup, self.flytextgroup
         #Explosion.groups= self.allgroup, self.explosiongroup
         Rocket.groups= self.allgroup, self.rocketgroup
         EvilMonster.groups= self.allgroup, self.monstergroup
         Fireball.groups= self.allgroup, self.fireballgroup
         Powerup.groups= self.allgroup, self.powerupgroup
-        
+        Missile.groups= self.allgroup, self.missilegroup
    
         # ------ player1,2,3: mouse, keyboard, joystick ---
         #self.mouse1 = Mouse(control="mouse", color=(255,0,0))
@@ -745,13 +970,13 @@ class PygView(object):
         #self.mouse4 = Mouse(control="joystick1", color=(255,128,255))
         #self.mouse5 = Mouse(control="joystick2", color=(255,255,255))
 
-        self.player1 =  Spaceship(warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2,-PygView.height/2))
-        self.player2 =  Spaceship(warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2+100,-PygView.height/2))
+        self.player1 =  Player(warp_on_edge=True, pos=pygame.math.Vector2(Viewer.width/2,-Viewer.height/2))
+        self.player2 =  Player(warp_on_edge=True, pos=pygame.math.Vector2(Viewer.width/2+100,-Viewer.height/2))
         
+        self.generate_enemies()
         
-        
-        for x in range(2):
-            EvilMonster( bounce_on_edge=True)
+        #for x in range(30):
+        #    EvilMonster( bounce_on_edge=True)
 
         
     def movement_indicator(self,vehicle,pygamepos, color=(0,200,0)):
@@ -771,8 +996,14 @@ class PygView(object):
         v.rotate_ip(vehicle.move.angle_to(v))
         target=pygamepos+v
         pygame.draw.line(self.screen, color, pygamepos,target,length)
-        
-           
+     
+    def generate_enemies(self):
+        for e in range(self.enemies):
+            EvilMonster()    
+        for b in range(self.bosses):
+            Levelboss()   
+    
+    
     def run(self):
         """The mainloop"""
         running = True
@@ -781,7 +1012,10 @@ class PygView(object):
         self.snipertarget = None
         gameOver = False
         exittime = 0
-        self.levelcleared = False
+        #self.levelcleared = False
+        
+       
+        
         while running:
             milliseconds = self.clock.tick(self.fps) #
             seconds = milliseconds / 1000
@@ -799,7 +1033,47 @@ class PygView(object):
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
-                    # ------ mine laying for player 1 ------    
+                   
+                    if event.key==pygame.K_m: 
+                        self.menurun()
+                        
+                    if event.key == pygame.K_e:
+                        for m in self.monstergroup:
+                            m.flee = not m.flee
+                    
+                    if event.key==pygame.K_1:
+                        self.player1.firemode="single"
+                        Flytext(500,400,"p1 single")
+                    
+                    if event.key==pygame.K_KP1:
+                        self.player2.firemode="single"
+                        Flytext(500,400, "p2 single")
+                    
+                    if event.key==pygame.K_2 and self.player1.effect_shots_per_shotgun >0:
+                        self.player1.firemode="shotgun"
+                        Flytext(500,400,"p1 shotgun")
+                    
+                    if event.key==pygame.K_KP2 and self.player2.effect_shots_per_shotgun >0:
+                        self.player2.firemode="shotgun"
+                        Flytext(500,400,"p2 shotgun")
+                           
+                    if event.key==pygame.K_3 and self.player1.machinegun >0:
+                           self.player1.firemode="machine gun"
+                           Flytext(500,400,"p1 machine gun")
+                           
+                    if event.key==pygame.K_KP3 and self.player2.machinegun >0:
+                           self.player2.firemode="machine gun"
+                           Flytext(500,400,"p2 machine gun")
+                        
+                    if event.key==pygame.K_4:
+                        Missile(bossnumber=0)
+                    
+                    # ------ salvo player 1 -----
+                    if event.key == pygame.K_TAB:
+                        self.player1.fire()  
+                    if event.key == pygame.K_SPACE:
+                        self.player2.fire()    
+                    # ------ mine laying for player ------    
                     if event.key == pygame.K_c:
                         if self.player1.mines>0:
                             Mine(pos=pygame.math.Vector2(self.player1.pos.x, self.player1.pos.y),bossnumber=self.player1.number)
@@ -810,7 +1084,7 @@ class PygView(object):
                             Mine(pos=pygame.math.Vector2(self.player2.pos.x, self.player2.pos.y),bossnumber=self.player2.number)
                             self.player2.mines-=1
                         #print("mine at ", self.player1.pos)
-                    # PygView.width/2, PygView.height/2,  "set_angle: 135°", color=(255,0,0), duration = 3, fontsize=20)
+                    # Viewer.width/2, Viewer.height/2,  "set_angle: 135°", color=(255,0,0), duration = 3, fontsize=20)
                     # ---- stop movement for self.player1 -----
                     if event.key == pygame.K_r:
                         self.player1.move *= 0.1 # remove 90% of movement
@@ -826,23 +1100,22 @@ class PygView(object):
                     if event.key == pygame.K_h:
                         self.player1.move *=0
                         self.player2.move *=0
+                    if event.key == pygame.K_q:
+                        self.loadbackground()
    
             # delete everything on screen
             self.screen.blit(self.background, (0, 0))
             
             #--- create powerups -------
-            if random.random()<0.1:
+            if random.random()<0.01:
                 Powerup(max_age=2)
             
             
-            # ---- create minibosses when all evilmonsters are dead ---
-            if not self.levelcleared:
-                if len(self.monstergroup) == 0:
-                    for x in range(4):
-                        Levelboss()
-                    self.levelcleared=True
-            
-            
+            # ---- next wave ? ------
+            if len(self.monstergroup) == 0:
+                # flytext?
+                self.next_wave()
+                
             # --- line from eck to mouse ---
             #pygame.draw.line(self.screen, (random.randint(200,250),0,0), (self.player1.pos.x, -self.player1.pos.y), (self.mouse1.x, self.mouse1.y))
 
@@ -857,12 +1130,12 @@ class PygView(object):
             if pressed_keys[pygame.K_d]:
                 self.player1.rotate(-3)
             if pressed_keys[pygame.K_w]:
-                v = pygame.math.Vector2(1,0)
+                v = pygame.math.Vector2(self.player1.speed,0)
                 v.rotate_ip(self.player1.angle)
                 self.player1.move += v
                 Smoke(pos=self.player1.pos)
             if pressed_keys[pygame.K_s]:
-                v = pygame.math.Vector2(1,0)
+                v = pygame.math.Vector2(self.player1.speed / 2,0)
                 v.rotate_ip(self.player1.angle)
                 self.player1.move += -v
     
@@ -880,13 +1153,12 @@ class PygView(object):
                 v.rotate_ip(self.player2.angle)
                 self.player2.move += -v
             #---- fire-----
-            if pressed_keys[pygame.K_TAB]:
+            if pressed_keys[pygame.K_TAB] and self.player1.firemode == "machine gun":
                 self.player1.fire()
-            if pressed_keys[pygame.K_SPACE]:
+            if pressed_keys[pygame.K_SPACE] and self.player2.firemode == "machine gun" :
                 self.player2.fire()
-            if pressed_keys[pygame.K_x]:
-                self.player1.fire()
-                self.player2.fire()
+            
+          
                 
             # ------ mouse handler ------
             #left,middle,right = pygame.mouse.get_pressed()
@@ -912,7 +1184,39 @@ class PygView(object):
             # write text below sprites
             write(self.screen, "FPS: {:8.3}".format(
                 self.clock.get_fps() ), x=10, y=10)
+            write(self.screen, "points: {}:{}".format(self.player1.points, self.player2.points ), x=500, y=10,color=(1,1,1))
+            write(self.screen, "mines: {}".format(self.player1.mines), x=10, y=30, color=(self.player1.color))
+            write(self.screen, "mines: {}".format(self.player2.mines), x=10, y=55, color=(self.player2.color))
+            write(self.screen, "HP: {}".format(self.player1.hitpoints), x=10, y=80, color=(self.player1.color))
+            write(self.screen, "HP: {}".format(self.player2.hitpoints), x=10, y=105, color=(self.player2.color))
+            
+            # heat bar
+            normal = (255,0,0)
+            blink = (random.randint(50,255),0,0)
+            if self.player1.age < self.player1.triggerhappytime:
+                c = blink
+            else:
+                c = normal
+            if self.player2.age < self.player2.triggerhappytime:
+                v = blink
+            else:
+                v = normal
+            
+            t = self.player1.heat/self.player1.overheat
+            r = self.player2.heat/self.player2.overheat
+            pygame.draw.rect(self.screen, (200,200,200), (400,20,100,10),1)
+            pygame.draw.rect(self.screen, c, (400,20,t*100, 10))
+            pygame.draw.rect(self.screen, (200,200,200), (700,20,100,10),1)
+            pygame.draw.rect(self.screen, v, (700,20,r*100, 10))
+            
+            
+            # --------- update, ai etc ---------------
             self.allgroup.update(seconds)
+            # --- fly to closest
+            for m in self.monstergroup:
+                pygame.draw.line(self.screen, (0,0,255), (m.pos.x, -m.pos.y), (m.closest.pos.x, -m.closest.pos.y))
+               
+                    
 
             # --------- collision detection between monster and rocket -----
             for m in self.monstergroup:
@@ -922,6 +1226,11 @@ class PygView(object):
                     m.hitpoints -= r.damage
                     elastic_collision(m,r)
                     Explosion(pos=r.pos, max_age=0.25)
+                    bn = r.bossnumber
+                    if bn == self.player1.number :
+                        self.player1.points += 1
+                    elif bn == self.player2.number:
+                        self.player2.points += 1                                                                                    
                     r.kill()
             
             #---------collision detection between monster and player-------
@@ -929,40 +1238,68 @@ class PygView(object):
                 crashgroup = pygame.sprite.spritecollide(p, self.monstergroup,
                              False, pygame.sprite.collide_mask)
                 for m in crashgroup:
-                    elastic_collision(p,m) 
+                    if p.rammer > 0 and p.rammer < m.hitpoints:
+                        elastic_collision(p,m)
+                        m.hitpoints -= p.rammer
+                        p.points += p.rammer
+                    elif p.rammer > 0 and p.rammer > m.hitpoints:
+                        p.points += m.hitpoints
+                        m.hitpoints -= p.rammer
+                        
+                    else:
+                        elastic_collision(p,m)
+                        p.hitpoints-= 1 
                     
             #--------collision detection between monster and monster-------
             for m in self.monstergroup:
                 crashgroup = pygame.sprite.spritecollide(m, self.monstergroup,
-                             False, pygame.sprite.collide_circle)
+                             False, pygame.sprite.collide_mask)
                 for m2 in crashgroup:
                     if m.number < m2.number:
                         elastic_collision(m, m2)
             #----------collision detection between monster and mine----------
             for mi in self.minegroup:
                 crashgroup = pygame.sprite.spritecollide(mi, self.monstergroup,
-                             False, pygame.sprite.collide_circle)
+                             False, pygame.sprite.collide_mask)
                 for mo in crashgroup:
                     diffvector = mo.pos - mi.pos
                     diffvector.normalize_ip()
                     #print("diffvec", diffvector)
                     mo.move = diffvector * 100
-                    Fireball(pos=mi.pos)
+                    Fireball(pos=mi.pos, bossnumber=mi.bossnumber)####
                     mi.kill()
+                    self.loadbackground()
             #-----------collision detection between monster and fireball-----
             for f in self.fireballgroup:
                 crashgroup = pygame.sprite.spritecollide(f, self.monstergroup,
-                             False, pygame.sprite.collide_circle)
+                             False, pygame.sprite.collide_mask)
                 for m in crashgroup:
                     m.hitpoints -= f.damage
-                    print("monsterdamage",m.number,m.hitpoints)
+                    bn=f.bossnumber
+                    if bn == self.player1.number:
+                        self.player1.points += f.damage
+                    elif bn == self.player2.number:
+                        self.player2.points += f.damage
+                    
+                    #print("monsterdamage",m.number,m.hitpoints)
             #----------collision detection between player and powerup----
             for pl in self.playergroup:
                 crashgroup=pygame.sprite.spritecollide(pl, self.powerupgroup,
                            False, pygame.sprite.collide_mask)
                 for po in crashgroup:
                     po.kill()
-                    pl.mines=10
+                    pl.mines +=10
+                    pl.hitpoints += 25
+            #--------------pvp-------
+            #-----------issue-collision effects self
+            #for p in self.playergroup:
+             #   crashgroup = pygame.sprite.spritecollide(p, self.rocketgroup,
+               #              False, pygame.sprite.collide_mask)
+              #  for r in crashgroup:
+                #    p.hitpoints -= r.damage
+                 #   elastic_collision(p,r)
+                  #  Explosion(pos=r.pos, max_age=0.25)
+                   # r.kill()
                     
             # ----------- clear, draw , update, flip -----------------
             self.allgroup.draw(self.screen)
@@ -985,6 +1322,212 @@ class PygView(object):
         pygame.mouse.set_visible(True)    
         pygame.quit()
 
-if __name__ == '__main__':
-    PygView(1430,800).run() # try PygView(800,600).run()
 
+    def menurun(self):
+        """The mainloop"""
+        running = True
+        pygame.mouse.set_visible(True)    
+        self.menu = True
+        oldleft, oldmiddle, oldright = False, False, False
+        while running:
+            milliseconds = self.clock.tick(self.fps) #
+            seconds = milliseconds / 1000
+            self.menuduration += seconds
+            # -------- events ------
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                # ------- pressed and released key ------
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+                    # ------ mine laying for player ------    
+               
+            # delete everything on screen
+            self.screen.blit(self.background, (0, 0))
+            # ---- wo ist die Maus ---
+            x, y = pygame.mouse.get_pos()
+            items = len(Game.menuitems)
+            if y < 125:
+                Game.menuindex = 0
+            elif y < 175 and items > 1:
+                Game.menuindex = 1
+            elif y < 225 and items > 2:
+                Game.menuindex = 2
+            elif y < 275 and items > 3:
+                Game.menuindex = 3
+            elif y < 325 and items > 4:
+                Game.menuindex = 4
+            elif y < 375 and items > 5:
+                Game.menuindex = 5
+            elif y < 425 and items > 6:
+                Game.menuindex = 6
+            elif y < 475 and items > 7:
+                Game.menuindex = 7
+            elif y < 525 and items > 8:
+                Game.menuindex = 8
+            elif y < 575 and items > 9:
+                Game.menuindex = 9
+            elif y < 625 and items > 10:
+                Game.menuindex = 10
+            elif y < 675 and items > 11:
+                Game.menuindex = 11
+            elif y < 725 and items > 12:
+                Game.menuindex = 12
+            elif y < 775 and items > 13:
+                Game.menuindex = 13
+            elif y < 825 and items > 14:
+                Game.menuindex = 13
+            # --- background rect for selected item ----
+            pygame.draw.rect(self.screen, (255,0,255), (100, 100+Game.menuindex * 50 -25, 500, 50))
+            # --- menu !!!! ----
+            write(self.screen, "Menu", x=375, y=30,color=(255,0,255),
+                  fontsize=48, center=True)
+            for a,m in enumerate(Game.menuitems):
+                write(self.screen, m , x=375, y=100+a*50, color=(1,1,1),
+                      fontsize=32, center=True)
+            # --- cursor ---
+            write(self.screen, "-->", x = 150, y=100+Game.menuindex*50, 
+                      color=(1,1,1), fontsize=32, center=True)
+            # write text below sprites
+            write(self.screen, "menu FPS: {:8.3}".format(
+                self.clock.get_fps() ), x=10, y=10)
+            self.flytextgroup.update(seconds)
+            self.flytextgroup.draw(self.screen)
+            
+            # ------ mouse handler ------
+            left,middle,right = pygame.mouse.get_pressed()
+            if oldleft and not left:
+                 t=Game.menuitems[Game.menuindex]
+                 #Flytext(x=600,y=400, text=t)
+                 #auswertung nach linksklick
+                 if t == "exit":
+                     return
+                 elif t == "upgrade player1":
+                     Game.menuitems = Game.upgradeitems[:]
+                     self.activeplayer = self.player1
+                 elif t == "upgrade player2":
+                     Game.menuitems = Game.upgradeitems[:]
+                     self.activeplayer = self.player2
+                 
+                 elif t == "credits":
+                     Game.menuitems = Game.creditmenu
+                 elif t == "back":
+                     Game.menuitems = Game.mainitems[:]
+                 elif t == "options":
+                     Game.menuitems = Game.optionmenu
+                 elif t == "resolution":
+                     Game.menuitems = Game.resmenu
+                 #---auswertung upgrade------
+                 elif Game.menuitems == Game.resmenu:
+                     resstring = t
+                     xpos = resstring.find("x")
+                     x = int(resstring[:xpos])
+                     y = int(resstring[xpos+1:])
+                     Viewer.width = x
+                     Viewer.height = y
+                     self.set_resolution()
+                 elif t == "single button":
+                     price = 10
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.effect_shots_per_single_shot +=1 
+                         Flytext(500,400, "new salvo effect: {}".format(self.activeplayer.effect_shots_per_single_shot))
+                     else:
+                         Flytext(500, 400, "not enough money")
+                      
+                 elif t == "shotgun":
+                     price = 20
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.effect_shots_per_shotgun +=1
+                         Flytext(500,400, "new salvo effect: {}".format(self.activeplayer.effect_shots_per_shotgun))
+                     else:
+                         Flytext(500, 400, "not enough money")
+                 
+                 elif t == "shotgun dispersal":
+                     price = 20
+                     if self.activeplayer.points >= price and self.activeplayer.shotgunangle <360:
+                         self.activeplayer.points -= price
+                         self.activeplayer.shotgunangle += 5
+                         Flytext(500, 400, "shotgun dispersal +5 you are now at {}".format(self.activeplayer.shotgunangle))
+                     else:
+                         Flytext(500, 400, "not enough money or dispersal already 360")       
+                         
+                 elif t == "machine gun":
+                     price = 30
+                     if self.activeplayer.points >= price and self.activeplayer.machinegun <= 1:
+                         self.activeplayer.points -= price
+                         self.activeplayer.machinegun += 1
+                         Flytext(500,400,"machine gun purchased")
+                     elif self.activeplayer.machinegun ==1:
+                         Flytext(500,400, "already unlocked")
+                     else:
+                         Flytext(500, 400, "not enough money")
+              
+                 elif t == "MG tolerance":
+                     price = 30*self.activeplayer.overheat
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.overheat += 5
+                         Flytext(500,400, "tolerance increased")
+                     else:
+                         Flytext(500,400,"not enough money")
+                         
+                 elif t == "MG cooling system":
+                     price = 30
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.cool += 1
+                         Flytext(500,400,"cooling now at level {}".format(self.activeplayer.cool))
+                     else:
+                         Flytext(500,400,"not enough money")
+                         
+                 elif t =="mines":
+                     price = 5
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.mines += 1
+                         Flytext(500, 400,"1 mine added")
+                     else:
+                         Flytext(500, 400, "not enough money")
+                                   
+                 elif  t == "HP":
+                     price = 100
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.hitpoints += 5
+                         Flytext(500,400, "HP +5. You have now {} hp".format(self.activeplayer.hitpoints))
+                     else:
+                         Flytext(500,400, "not enough money")
+                 
+                 elif t == "speed":        
+                     price = 100
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.speed += 1
+                         Flytext(500,400, "speed +1. You´re now at {} speed".format(self.activeplayer.speed))
+                     else:
+                         Flytext(500,400, "not enough money")
+                 
+                 elif t == "rammer":         
+                     price = 1
+                     if self.activeplayer.points >=price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.rammer += 1
+                         Flytext(500,400, "level {} rammer equiped".format(self.activeplayer.rammer))
+                     else:
+                         Flytext(500, 400, "not enough money")
+ 
+            #    self.launchRocket(pygame.mouse.get_pos())
+            #if right:
+            #    self.launchRocket(pygame.mouse.get_pos())
+            oldleft, oldmiddle, oldright = left, middle, right
+            # -------- next frame -------------
+            pygame.display.flip()
+        # bye bye menu
+        pygame.mouse.set_visible(False)    
+
+
+if __name__ == '__main__':
+    Viewer(1430,800).run() # try Viewer(800,600).run()
