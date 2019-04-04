@@ -432,6 +432,11 @@ class Player(VectorSprite):
         self.heatpenalty=2.5
         self.triggerhappytime = 0
         self.machinegun = 0
+        self.sniper = 0
+        self.snipershot=0
+        self.sniperreload=1
+        self.sniper_ok = 0
+        self.sensitivity=3
     
     def kill(self):
         Explosion(pos=self.pos,)
@@ -452,7 +457,9 @@ class Player(VectorSprite):
             self.triggerhappytime = self.age + self.heatpenalty
         self.heat -= self.cool* seconds
         self.heat = max(0, self.heat)
-        
+        if self.snipershot==self.sniperreload:
+            self.snipershot-=self.sniperreload*seconds
+            self.snipershot= max(0,1)
     def fire(self):
         p = pygame.math.Vector2(self.pos.x, self.pos.y)
         t=pygame.math.Vector2(25,0) #cannon muzzle
@@ -493,7 +500,19 @@ class Player(VectorSprite):
             v+=self.move
             a=self.angle   
             Rocket(pos=p+t, move=v , angle=a, bossnumber=self.number, color=self.color)
-                
+            
+        elif self.firemode == "sniper":
+            if self.age > self.sniper_ok: 
+                #player is allowed to shoot
+                v = pygame.math.Vector2(100,0)
+                v.rotate_ip(self.angle)
+                v+=self.move
+                a=self.angle
+                Rocket(pos=p+t, move=v*15 , angle=a, bossnumber=self.number, color=self.color)
+                self.sniper_ok = self.age + self.sniperreload # one second cooldown
+            else:
+                # i can not shoot i must wait
+                return
             
         
 class EvilMonster(VectorSprite):
@@ -505,10 +524,11 @@ class EvilMonster(VectorSprite):
         self.radius=25
         self.bounce_on_edge=True
         self.flee = False
+        self.color= ((random.randint(1,255)),(random.randint(1,255)),(random.randint(1,255))) 
     
     def create_image(self):
         self.image = pygame.Surface((50,50))
-        pygame.draw.circle(self.image, (255, 255, 0), (25,25), 25)
+        pygame.draw.circle(self.image,self.color, (25,25), 25)
         pygame.draw.circle(self.image, (self.red, 0, 0), (10,10), 10)
         pygame.draw.circle(self.image, (self.red, 0, 0), (40,10), 10)
         self.image.set_colorkey((0,0,0))
@@ -588,7 +608,7 @@ class Levelboss(EvilMonster):
 
     def create_image(self):
         self.image = pygame.Surface((80,80))
-        pygame.draw.circle(self.image, (255, 255, 0), (40,40), 40)
+        pygame.draw.circle(self.image,((random.randint(1,255)),(random.randint(1,255)),(random.randint(1,255))), (40,40), 40)
         pygame.draw.circle(self.image, (self.red, 0, 0), (10,10), 10)
         pygame.draw.circle(self.image, (self.red, 0, 0), (70,10), 10)
         self.image.set_colorkey((0,0,0))
@@ -732,7 +752,8 @@ class Game():
                     "mines", "speed", "HP","rammer", "lockdown", "escape pod", "invisibility",
                     "astromech"]
     creditmenu = ["Artworks and Creative","Samuel Wetter","Advising","Horst Jens","code by ", "Horst Jens and", "Samuel Wetter"]
-    optionmenu = ["back","resolution"]
+    optionmenu = ["back","resolution","mouse sensitivity"]
+    sensmenu = ["back","very low","low","normal","high","very high","super high","mega high"]
     resmenu=[]
     #menu =  { "upgrade": ["upgrade rockets", "upgbrade shield", "...."],
             #   "downgrade": [ ... ] ,
@@ -779,8 +800,12 @@ class Missile(VectorSprite):
         self.pos = pygame.math.Vector2(boss.pos.x,boss.pos.y)
         self.move = pygame.math.Vector2(boss.move.x, boss.move.y)
         self.angle = boss.angle
-        self.speed = 15
+        self.speed = 3
+        self.top_speed = 200
+        #self.acc = 
+        self.rotation_speed = 35 # grad per second
         self.target_selection()
+        self.warp_on_edge = True
     
     def create_image(self):
         self.image = pygame.Surface((30,10))
@@ -802,13 +827,35 @@ class Missile(VectorSprite):
         except:
             return 
         diff *= self.speed
-        self.move = diff
-        self.set_angle(self.move.angle_to(pygame.math.Vector2(1,0)))
-        
-        
-        
-        
+        rv = pygame.math.Vector2(1,0)
+        a1 = -diff.angle_to(rv)
+        # a1 ist winkel zum target
+        # 0.5 ist die toleranz beim zielen
+        if self.angle < a1 - 0.5 :
+            delta = self.rotation_speed * seconds
+        elif self.angle > a1 + 0.5 :
+            delta = - self.rotation_speed * seconds
+        else:
+            delta = 0
+        self.move.rotate_ip(delta)
+        self.rotate(delta)
+        speed = self.move.length()
+        if speed > 0:
+            self.move.normalize_ip()
+            self.move *= (speed+1)
+        else:
+            m = pygame.math.Vector2(1,0)
+            m.rotate_ip(self.angle)
+            self.move = m 
+        #self.move *= 1.15 # % schneller (wert muss über 1 sein, zb 1.01)
+        if self.move.length() > self.top_speed:
+            self.move.normalize_ip() # hat länge 1
+            self.move *= self.top_speed   
+        #self.set_angle(a)
+        #self.move = diff
         VectorSprite.update(self, seconds)
+        # ---- smoking ---
+        Smoke(pos=pygame.math.Vector2(self.pos.x, self.pos.y))
 
     def target_selection(self):
         # fly toward closest enemy 
@@ -855,8 +902,8 @@ class Viewer(object):
         self.menu = False
         self.fps = fps
         self.playtime = 0.0
-        self.enemies=1
-        self.bosses=0
+        self.enemies=5
+        self.bosses=1
         # ---- resmenu ----
         li = ["back"]
         for i in pygame.display.list_modes():
@@ -1067,6 +1114,14 @@ class Viewer(object):
                         
                     if event.key==pygame.K_4:
                         Missile(bossnumber=0)
+                        
+                    if event.key==pygame.K_5 and self.player1.sniper > 0:
+                        self.player1.firemode="sniper"
+                        Flytext(500,400,"p1 sniper")
+                        
+                    if event.key==pygame.K_KP5 and self.player2.sniper > 0:
+                        self.player2.firemode="sniper"
+                        Flytext(500,400,"p2 sniper")
                     
                     # ------ salvo player 1 -----
                     if event.key == pygame.K_TAB:
@@ -1126,9 +1181,9 @@ class Viewer(object):
             # if pressed_keys[pygame.K_LSHIFT]:
                 # paint range circles for cannons
             if pressed_keys[pygame.K_a]:
-                self.player1.rotate(3)
+                self.player1.rotate((self.player1.sensitivity))
             if pressed_keys[pygame.K_d]:
-                self.player1.rotate(-3)
+                self.player1.rotate(-(self.player1.sensitivity))
             if pressed_keys[pygame.K_w]:
                 v = pygame.math.Vector2(self.player1.speed,0)
                 v.rotate_ip(self.player1.angle)
@@ -1140,9 +1195,9 @@ class Viewer(object):
                 self.player1.move += -v
     
             if pressed_keys[pygame.K_LEFT]:
-                self.player2.rotate(3)
+                self.player2.rotate((self.player2.sensitivity))
             if pressed_keys[pygame.K_RIGHT]:
-                self.player2.rotate(-3)
+                self.player2.rotate(-(self.player2.sensitivity))
             if pressed_keys[pygame.K_UP]:
                 v = pygame.math.Vector2(1,0)
                 v.rotate_ip(self.player2.angle)
@@ -1216,23 +1271,40 @@ class Viewer(object):
             for m in self.monstergroup:
                 pygame.draw.line(self.screen, (0,0,255), (m.pos.x, -m.pos.y), (m.closest.pos.x, -m.closest.pos.y))
                
-                    
+            ### --- missle target displayer -----
+            for m in self.missilegroup:
+                pygame.draw.line(self.screen, (200,0,0), (m.pos.x, -m.pos.y), (m.target.pos.x, -m.target.pos.y))
+                               
 
             # --------- collision detection between monster and rocket -----
             for m in self.monstergroup:
                 crashgroup = pygame.sprite.spritecollide(m, self.rocketgroup,
                              False, pygame.sprite.collide_mask)
                 for r in crashgroup:
-                    m.hitpoints -= r.damage
-                    elastic_collision(m,r)
-                    Explosion(pos=r.pos, max_age=0.25)
-                    bn = r.bossnumber
-                    if bn == self.player1.number :
-                        self.player1.points += 1
-                    elif bn == self.player2.number:
-                        self.player2.points += 1                                                                                    
-                    r.kill()
+                    if self.player1.firemode=="sniper" and r.bossnumber==0:  
+                        Explosion(pos=r.pos, max_age=0.25)
+                        bn = r.bossnumber
+                        self.player1.points+=m.hitpoints                                                                                    
+                        m.kill()
             
+                    else: 
+                        m.hitpoints -= r.damage
+                        elastic_collision(m,r)
+                        Explosion(pos=r.pos, max_age=0.25)
+                        bn = r.bossnumber
+                        if bn == self.player1.number :
+                            self.player1.points += 1
+                        elif bn == self.player2.number:
+                            self.player2.points += 1                                                                                    
+                        r.kill()
+            
+            #---------collision dtection between manster and missile----
+            for mo in self.monstergroup:
+                crashgroup = pygame.sprite.spritecollide(mo, self.missilegroup,
+                             False, pygame.sprite.collide_mask)
+                for mi in crashgroup:
+                    Fireball(pos=mi.pos, damage =50)
+                    mi.kill()
             #---------collision detection between monster and player-------
             for p in self.playergroup:
                 crashgroup = pygame.sprite.spritecollide(p, self.monstergroup,
@@ -1377,7 +1449,11 @@ class Viewer(object):
             elif y < 775 and items > 13:
                 Game.menuindex = 13
             elif y < 825 and items > 14:
-                Game.menuindex = 13
+                Game.menuindex = 14#F0F0F0
+            elif y < 875 and items > 15:
+                Game.menuindex = 15
+            elif y < 925 and items > 16:
+                Game.menuindex = 16
             # --- background rect for selected item ----
             pygame.draw.rect(self.screen, (255,0,255), (100, 100+Game.menuindex * 50 -25, 500, 50))
             # --- menu !!!! ----
@@ -1416,8 +1492,32 @@ class Viewer(object):
                      Game.menuitems = Game.mainitems[:]
                  elif t == "options":
                      Game.menuitems = Game.optionmenu
+                 elif t == "mouse sensitivity":
+                     Game.menuitems = Game.sensmenu
                  elif t == "resolution":
                      Game.menuitems = Game.resmenu
+                 elif t == "very low":
+                     for p in self.playergroup:
+                         p.sensitivity = 1
+                 elif t == "low":
+                     for p in self.playergroup:
+                         p.sensitivity = 2
+                 elif t == "normal":
+                     for p in self.playergroup:
+                         p.sensitivity = 3
+                 elif t == "high":
+                     for p in self.playergroup:
+                         p.sensitivity = 4
+                 elif t == "very high":
+                     for p in self.playergroup:
+                         p.sensitivity = 5
+                 elif t == "super high":
+                     for p in self.playergroup:
+                         p.sensitivity = 8
+                 elif t == "mega high":
+                     for p in self.playergroup:
+                         p.sensitivity = 12
+                 
                  #---auswertung upgrade------
                  elif Game.menuitems == Game.resmenu:
                      resstring = t
@@ -1466,7 +1566,7 @@ class Viewer(object):
                          Flytext(500, 400, "not enough money")
               
                  elif t == "MG tolerance":
-                     price = 30*self.activeplayer.overheat
+                     price = 30
                      if self.activeplayer.points >= price:
                          self.activeplayer.points -= price
                          self.activeplayer.overheat += 5
@@ -1480,6 +1580,15 @@ class Viewer(object):
                          self.activeplayer.points -= price
                          self.activeplayer.cool += 1
                          Flytext(500,400,"cooling now at level {}".format(self.activeplayer.cool))
+                     else:
+                         Flytext(500,400,"not enough money")
+                         
+                 elif t == "sniper":
+                     price = 1
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.sniper += 1
+                         Flytext(500,400,"sniper purchased")
                      else:
                          Flytext(500,400,"not enough money")
                          
@@ -1511,7 +1620,7 @@ class Viewer(object):
                          Flytext(500,400, "not enough money")
                  
                  elif t == "rammer":         
-                     price = 1
+                     price = 50
                      if self.activeplayer.points >=price:
                          self.activeplayer.points -= price
                          self.activeplayer.rammer += 1
