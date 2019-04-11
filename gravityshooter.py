@@ -1,6 +1,6 @@
 """
-author: Horst JENS
-email: horstjens@gmail.com
+author: Samuel Wetter
+email: samuel.wetter@gmail.com
 contact: see http://spielend-programmieren.at/de:kontakt
 license: gpl, see http://www.gnu.org/licenses/gpl-3.0.de.html
 download: 
@@ -424,6 +424,7 @@ class Player(VectorSprite):
             self.color = (255,0,0)
         self.speed = 1
         self.hitpoints = 100
+        self.hitpointsfull = 100
         self.rammer = 0
         self.radius=25
         self.heat=0
@@ -432,11 +433,13 @@ class Player(VectorSprite):
         self.heatpenalty=2.5
         self.triggerhappytime = 0
         self.machinegun = 0
+        self.missile =0
         self.sniper = 0
         self.snipershot=0
         self.sniperreload=1
         self.sniper_ok = 0
         self.sensitivity=3
+        self.invisibility = True
     
     def kill(self):
         Explosion(pos=self.pos,)
@@ -460,6 +463,9 @@ class Player(VectorSprite):
         if self.snipershot==self.sniperreload:
             self.snipershot-=self.sniperreload*seconds
             self.snipershot= max(0,1)
+    
+    
+    
     def fire(self):
         p = pygame.math.Vector2(self.pos.x, self.pos.y)
         t=pygame.math.Vector2(25,0) #cannon muzzle
@@ -513,8 +519,86 @@ class Player(VectorSprite):
             else:
                 # i can not shoot i must wait
                 return
-            
+           
+    def lockdown(self):
         
+        # fly toward closest enemy 
+        targets = []
+        for n in VectorSprite.numbers:
+            if VectorSprite.numbers[n].__class__.__name__ in ["EvilMonster", "Levelboss"]:
+                targets.append(VectorSprite.numbers[n])
+        if len(targets) == 0:
+            self.hitpoints = 0
+
+            return
+        # ---- search closest guy in targets ------
+        self.closest = None
+        bestdist = None
+        self.diff = None
+        for t in targets:
+            diff = self.pos - t.pos
+            distance = diff.length()
+            if (bestdist is None) or (distance < bestdist):
+                bestdist = distance
+                self.closest = t
+                self.diff = diff
+                self.target_number = self.closest.number
+                self.target = self.closest
+        # rotate towards target
+           # lebt target noch?
+        if self.target_number not in VectorSprite.numbers:
+            self.target_selection()
+            return
+        # diffvector zum target
+        diff =  self.target.pos - self.pos
+        try:
+            diff.normalize_ip() # make length 1
+        except:
+            return 
+        diff *= self.speed
+        rv = pygame.math.Vector2(1,0)
+        a1 = -diff.angle_to(rv)
+        # a1 ist winkel zum target
+        # 0.5 ist die toleranz beim zielen
+        #if self.angle < a1 - 0.5 :
+        #    delta = self.rotation_speed * seconds
+        #elif self.angle > a1 + 0.5 :
+        #    delta = - self.rotation_speed * seconds
+        #else:
+        #    delta = 0
+        #self.move.rotate_ip(a1)
+        #self.rotate(delta)
+        self.set_angle(a1)
+        
+class Astromech(VectorSprite):
+    
+    def _overwrite_parameters(self):
+        self.hitpoints=1
+        self.color =((random.randint(1,255)),(random.randint(1,255)),(random.randint(1,255)))
+        self.bossdistance = pygame.math.Vector2(100,0)
+        self.bossangle = random.randint(0,360)
+        self.turnspeed = (random.random()*30+2.5)*random.choice((-1,1))
+        self.pos = VectorSprite.numbers[self.bossnumber].pos+self.bossdistance
+        self.kill_with_boss = True
+        
+    def update(self,seconds):
+        if self.bossnumber not in VectorSprite.numbers:
+            self.kill()
+            return
+        VectorSprite.update(self,seconds)
+        self.bossdistance.rotate_ip(self.turnspeed*seconds)
+        self.pos = VectorSprite.numbers[self.bossnumber].pos+self.bossdistance
+        self.rect.center=(self.pos.x,-self.pos.y)
+        
+        
+    def create_image(self):
+        self.image=pygame.Surface((10,10))
+        pygame.draw.circle(self.image,self.color, (5,5),5)
+        self.image.set_colorkey((0,0,0))
+        self.image.convert_alpha()
+        self.image0 = self.image.copy()
+        self.rect = self.image.get_rect()
+       
 class EvilMonster(VectorSprite):
     
     def _overwrite_parameters(self):
@@ -748,7 +832,7 @@ class Game():
     
     mainitems = ["exit", "upgrade player1","upgrade player2", "options", "credits"]
     menuindex = 0
-    upgradeitems = ["back", "single button", "shotgun","shotgun dispersal", "machine gun","MG tolerance","MG cooling system","rocket", "sniper",
+    upgradeitems = ["back", "single button", "shotgun","shotgun dispersal", "machine gun","MG tolerance","MG cooling system","missile", "sniper",
                     "mines", "speed", "HP","rammer", "lockdown", "escape pod", "invisibility",
                     "astromech"]
     creditmenu = ["Artworks and Creative","Samuel Wetter","Advising","Horst Jens","code by ", "Horst Jens and", "Samuel Wetter"]
@@ -902,8 +986,8 @@ class Viewer(object):
         self.menu = False
         self.fps = fps
         self.playtime = 0.0
-        self.enemies=5
-        self.bosses=1
+        self.enemies=1
+        self.bosses=0
         # ---- resmenu ----
         li = ["back"]
         for i in pygame.display.list_modes():
@@ -996,6 +1080,8 @@ class Viewer(object):
         self.powerupgroup = pygame.sprite.Group()
         self.flytextgroup = pygame.sprite.Group()
         self.missilegroup = pygame.sprite.Group()
+        self.astromechgroup = pygame.sprite.Group()
+        
         
         EvilMonster.groups = self.allgroup
         Player.groups = self.allgroup, self.playergroup
@@ -1009,6 +1095,7 @@ class Viewer(object):
         Fireball.groups= self.allgroup, self.fireballgroup
         Powerup.groups= self.allgroup, self.powerupgroup
         Missile.groups= self.allgroup, self.missilegroup
+        Astromech.groups= self.allgroup, self.astromechgroup
    
         # ------ player1,2,3: mouse, keyboard, joystick ---
         #self.mouse1 = Mouse(control="mouse", color=(255,0,0))
@@ -1018,7 +1105,10 @@ class Viewer(object):
         #self.mouse5 = Mouse(control="joystick2", color=(255,255,255))
 
         self.player1 =  Player(warp_on_edge=True, pos=pygame.math.Vector2(Viewer.width/2,-Viewer.height/2))
+        
         self.player2 =  Player(warp_on_edge=True, pos=pygame.math.Vector2(Viewer.width/2+100,-Viewer.height/2))
+        self.astro1 = Astromech(bossnumber=self.player1.number)
+        
         
         self.generate_enemies()
         
@@ -1112,8 +1202,13 @@ class Viewer(object):
                            self.player2.firemode="machine gun"
                            Flytext(500,400,"p2 machine gun")
                         
-                    if event.key==pygame.K_4:
+                    if event.key==pygame.K_4 and self.player1.missile >0:
                         Missile(bossnumber=0)
+                        self.player1.missile -= 1
+                        
+                    if event.key == pygame.K_KP4 and self.player2.missile >0:
+                        Missile(bossnumber=1)
+                        self.player2.missile -= 1
                         
                     if event.key==pygame.K_5 and self.player1.sniper > 0:
                         self.player1.firemode="sniper"
@@ -1138,6 +1233,9 @@ class Viewer(object):
                         if self.player2.mines>0:
                             Mine(pos=pygame.math.Vector2(self.player2.pos.x, self.player2.pos.y),bossnumber=self.player2.number)
                             self.player2.mines-=1
+                            
+                    if event.key == pygame.K_CAPSLOCK:
+                        self.player1.lockdown()
                         #print("mine at ", self.player1.pos)
                     # Viewer.width/2, Viewer.height/2,  "set_angle: 135°", color=(255,0,0), duration = 3, fontsize=20)
                     # ---- stop movement for self.player1 -----
@@ -1155,8 +1253,9 @@ class Viewer(object):
                     if event.key == pygame.K_h:
                         self.player1.move *=0
                         self.player2.move *=0
-                    if event.key == pygame.K_q:
-                        self.loadbackground()
+                    
+                    if event.key == pygame.K_F1:
+                        Astromech(pos=pygame.math.Vector2(200,-400))
    
             # delete everything on screen
             self.screen.blit(self.background, (0, 0))
@@ -1212,6 +1311,14 @@ class Viewer(object):
                 self.player1.fire()
             if pressed_keys[pygame.K_SPACE] and self.player2.firemode == "machine gun" :
                 self.player2.fire()
+                
+                
+            if pressed_keys[pygame.K_q] and self.player1.invisibility == True:
+                if self.player1.color == (0,0,255):
+                    self.player1.color = (240,240,240)
+                elif self.player1.color == (240,240,240):
+                    self.player1.color = (0,0,255)
+                self.player1.create_image()
             
           
                 
@@ -1242,8 +1349,8 @@ class Viewer(object):
             write(self.screen, "points: {}:{}".format(self.player1.points, self.player2.points ), x=500, y=10,color=(1,1,1))
             write(self.screen, "mines: {}".format(self.player1.mines), x=10, y=30, color=(self.player1.color))
             write(self.screen, "mines: {}".format(self.player2.mines), x=10, y=55, color=(self.player2.color))
-            write(self.screen, "HP: {}".format(self.player1.hitpoints), x=10, y=80, color=(self.player1.color))
-            write(self.screen, "HP: {}".format(self.player2.hitpoints), x=10, y=105, color=(self.player2.color))
+            write(self.screen, "HP: {:.0f}".format(self.player1.hitpoints), x=10, y=80, color=(self.player1.color))
+            write(self.screen, "HP: {:.0f}".format(self.player2.hitpoints), x=10, y=105, color=(self.player2.color))
             
             # heat bar
             normal = (255,0,0)
@@ -1274,8 +1381,8 @@ class Viewer(object):
             ### --- missle target displayer -----
             for m in self.missilegroup:
                 pygame.draw.line(self.screen, (200,0,0), (m.pos.x, -m.pos.y), (m.target.pos.x, -m.target.pos.y))
-                               
-
+       
+            
             # --------- collision detection between monster and rocket -----
             for m in self.monstergroup:
                 crashgroup = pygame.sprite.spritecollide(m, self.rocketgroup,
@@ -1298,12 +1405,12 @@ class Viewer(object):
                             self.player2.points += 1                                                                                    
                         r.kill()
             
-            #---------collision dtection between manster and missile----
+            #---------collision dtection between monster and missile----
             for mo in self.monstergroup:
                 crashgroup = pygame.sprite.spritecollide(mo, self.missilegroup,
                              False, pygame.sprite.collide_mask)
                 for mi in crashgroup:
-                    Fireball(pos=mi.pos, damage =50)
+                    Fireball(pos=mi.pos, damage =50, bosnumber = mi.bossnumber)
                     mi.kill()
             #---------collision detection between monster and player-------
             for p in self.playergroup:
@@ -1353,6 +1460,15 @@ class Viewer(object):
                     elif bn == self.player2.number:
                         self.player2.points += f.damage
                     
+                    
+                    
+            #---------------collision detection between monster and astromech
+            for a in self.astromechgroup:
+                crashgroup = pygame.sprite.spritecollide(a, self.monstergroup,
+                                False, pygame.sprite.collide_rect)
+                for m in crashgroup:
+                    a.hitpoints-=1
+                
                     #print("monsterdamage",m.number,m.hitpoints)
             #----------collision detection between player and powerup----
             for pl in self.playergroup:
@@ -1362,6 +1478,8 @@ class Viewer(object):
                     po.kill()
                     pl.mines +=10
                     pl.hitpoints += 25
+                    if pl.hitpoints > pl.hitpointsfull:
+                        pl.hitpointsfull += 25
             #--------------pvp-------
             #-----------issue-collision effects self
             #for p in self.playergroup:
@@ -1375,6 +1493,18 @@ class Viewer(object):
                     
             # ----------- clear, draw , update, flip -----------------
             self.allgroup.draw(self.screen)
+            
+                                    
+            # ---------------------Astromechhealing-------------------
+            for a in self.astromechgroup:
+                boss=VectorSprite.numbers[a.bossnumber]
+                if boss.hitpoints < boss.hitpointsfull:
+                    boss.hitpoints+=1*seconds
+                    dist=pygame.math.Vector2(15,0)
+                    dist.rotate_ip(random.randint(0,360))
+                    t = boss.pos + dist
+                    pygame.draw.line(self.screen, (30,255,255),(a.pos.x,-a.pos.y),(t.x,-t.y),1)
+                
 
             self.movement_indicator(self.player1,(105,105))
             self.movement_indicator(self.player2,(1320,105))
@@ -1497,24 +1627,31 @@ class Viewer(object):
                  elif t == "resolution":
                      Game.menuitems = Game.resmenu
                  elif t == "very low":
+                     Flytext(500,400, "very low confirmed")
                      for p in self.playergroup:
                          p.sensitivity = 1
                  elif t == "low":
+                     Flytext(500,400, "low confirmed")
                      for p in self.playergroup:
                          p.sensitivity = 2
                  elif t == "normal":
+                     Flytext(500,400, "normal confirmed")
                      for p in self.playergroup:
                          p.sensitivity = 3
                  elif t == "high":
+                     Flytext(500,400,"high confirmed")
                      for p in self.playergroup:
                          p.sensitivity = 4
                  elif t == "very high":
+                     Flytext(500,400, "very high confirmed")
                      for p in self.playergroup:
                          p.sensitivity = 5
                  elif t == "super high":
+                     Flytext(500,400, "super high confirmed")
                      for p in self.playergroup:
                          p.sensitivity = 8
                  elif t == "mega high":
+                     Flytext(500,400, "mega high confirmed")
                      for p in self.playergroup:
                          p.sensitivity = 12
                  
@@ -1528,7 +1665,7 @@ class Viewer(object):
                      Viewer.height = y
                      self.set_resolution()
                  elif t == "single button":
-                     price = 10
+                     price = 1
                      if self.activeplayer.points >= price:
                          self.activeplayer.points -= price
                          self.activeplayer.effect_shots_per_single_shot +=1 
@@ -1537,7 +1674,7 @@ class Viewer(object):
                          Flytext(500, 400, "not enough money")
                       
                  elif t == "shotgun":
-                     price = 20
+                     price = 1
                      if self.activeplayer.points >= price:
                          self.activeplayer.points -= price
                          self.activeplayer.effect_shots_per_shotgun +=1
@@ -1546,7 +1683,7 @@ class Viewer(object):
                          Flytext(500, 400, "not enough money")
                  
                  elif t == "shotgun dispersal":
-                     price = 20
+                     price = 1
                      if self.activeplayer.points >= price and self.activeplayer.shotgunangle <360:
                          self.activeplayer.points -= price
                          self.activeplayer.shotgunangle += 5
@@ -1555,7 +1692,7 @@ class Viewer(object):
                          Flytext(500, 400, "not enough money or dispersal already 360")       
                          
                  elif t == "machine gun":
-                     price = 30
+                     price = 1
                      if self.activeplayer.points >= price and self.activeplayer.machinegun <= 1:
                          self.activeplayer.points -= price
                          self.activeplayer.machinegun += 1
@@ -1566,7 +1703,7 @@ class Viewer(object):
                          Flytext(500, 400, "not enough money")
               
                  elif t == "MG tolerance":
-                     price = 30
+                     price = 1
                      if self.activeplayer.points >= price:
                          self.activeplayer.points -= price
                          self.activeplayer.overheat += 5
@@ -1575,7 +1712,7 @@ class Viewer(object):
                          Flytext(500,400,"not enough money")
                          
                  elif t == "MG cooling system":
-                     price = 30
+                     price = 1
                      if self.activeplayer.points >= price:
                          self.activeplayer.points -= price
                          self.activeplayer.cool += 1
@@ -1583,6 +1720,14 @@ class Viewer(object):
                      else:
                          Flytext(500,400,"not enough money")
                          
+                 elif t == "missile":
+                     price = 1
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         self.activeplayer.missile +=1
+                         Flytext(500,400,"1 missile purchased")
+                     else:
+                         Flytext(500,400,"not enough money")
                  elif t == "sniper":
                      price = 1
                      if self.activeplayer.points >= price:
@@ -1593,7 +1738,7 @@ class Viewer(object):
                          Flytext(500,400,"not enough money")
                          
                  elif t =="mines":
-                     price = 5
+                     price = 1
                      if self.activeplayer.points >= price:
                          self.activeplayer.points -= price
                          self.activeplayer.mines += 1
@@ -1602,16 +1747,18 @@ class Viewer(object):
                          Flytext(500, 400, "not enough money")
                                    
                  elif  t == "HP":
-                     price = 100
+                     price = 1
                      if self.activeplayer.points >= price:
                          self.activeplayer.points -= price
                          self.activeplayer.hitpoints += 5
+                         if self.activeplayer.hitpoints > self.activeplayer.hitpointsfull:
+                             self.activeplayer.hitpointsfull += 5
                          Flytext(500,400, "HP +5. You have now {} hp".format(self.activeplayer.hitpoints))
                      else:
                          Flytext(500,400, "not enough money")
                  
                  elif t == "speed":        
-                     price = 100
+                     price = 1
                      if self.activeplayer.points >= price:
                          self.activeplayer.points -= price
                          self.activeplayer.speed += 1
@@ -1620,7 +1767,7 @@ class Viewer(object):
                          Flytext(500,400, "not enough money")
                  
                  elif t == "rammer":         
-                     price = 50
+                     price = 1
                      if self.activeplayer.points >=price:
                          self.activeplayer.points -= price
                          self.activeplayer.rammer += 1
