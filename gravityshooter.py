@@ -1,6 +1,6 @@
 """
-author: Samuel Wetter
-email: samuel.wetter@gmail.com
+author: Horst JENS
+email: horstjens@gmail.com
 contact: see http://spielend-programmieren.at/de:kontakt
 license: gpl, see http://www.gnu.org/licenses/gpl-3.0.de.html
 download: 
@@ -439,7 +439,7 @@ class Player(VectorSprite):
         self.sniperreload=1
         self.sniper_ok = 0
         self.sensitivity=3
-        self.invisibility = True
+        self.invisibility = False
     
     def kill(self):
         Explosion(pos=self.pos,)
@@ -598,7 +598,10 @@ class Astromech(VectorSprite):
         self.image.convert_alpha()
         self.image0 = self.image.copy()
         self.rect = self.image.get_rect()
-       
+
+
+
+               
 class EvilMonster(VectorSprite):
     
     def _overwrite_parameters(self):
@@ -833,8 +836,8 @@ class Game():
     mainitems = ["exit", "upgrade player1","upgrade player2", "options", "credits"]
     menuindex = 0
     upgradeitems = ["back", "single button", "shotgun","shotgun dispersal", "machine gun","MG tolerance","MG cooling system","missile", "sniper",
-                    "mines", "speed", "HP","rammer", "lockdown", "escape pod", "invisibility",
-                    "astromech"]
+                    "mines", "speed", "HP","rammer","astromech", "lockdown", "escape pod", "invisibility"
+                    ]
     creditmenu = ["Artworks and Creative","Samuel Wetter","Advising","Horst Jens","code by ", "Horst Jens and", "Samuel Wetter"]
     optionmenu = ["back","resolution","mouse sensitivity"]
     sensmenu = ["back","very low","low","normal","high","very high","super high","mega high"]
@@ -1081,7 +1084,7 @@ class Viewer(object):
         self.flytextgroup = pygame.sprite.Group()
         self.missilegroup = pygame.sprite.Group()
         self.astromechgroup = pygame.sprite.Group()
-        
+        self.cheatsgroup = pygame.sprite.Group()
         
         EvilMonster.groups = self.allgroup
         Player.groups = self.allgroup, self.playergroup
@@ -1096,6 +1099,7 @@ class Viewer(object):
         Powerup.groups= self.allgroup, self.powerupgroup
         Missile.groups= self.allgroup, self.missilegroup
         Astromech.groups= self.allgroup, self.astromechgroup
+        #Cheats.groups = self.allgroup, self.cheatsgroup
    
         # ------ player1,2,3: mouse, keyboard, joystick ---
         #self.mouse1 = Mouse(control="mouse", color=(255,0,0))
@@ -1107,7 +1111,7 @@ class Viewer(object):
         self.player1 =  Player(warp_on_edge=True, pos=pygame.math.Vector2(Viewer.width/2,-Viewer.height/2))
         
         self.player2 =  Player(warp_on_edge=True, pos=pygame.math.Vector2(Viewer.width/2+100,-Viewer.height/2))
-        self.astro1 = Astromech(bossnumber=self.player1.number)
+        
         
         
         self.generate_enemies()
@@ -1140,7 +1144,6 @@ class Viewer(object):
         for b in range(self.bosses):
             Levelboss()   
     
-    
     def run(self):
         """The mainloop"""
         running = True
@@ -1149,6 +1152,7 @@ class Viewer(object):
         self.snipertarget = None
         gameOver = False
         exittime = 0
+        self
         #self.levelcleared = False
         
        
@@ -1174,9 +1178,9 @@ class Viewer(object):
                     if event.key==pygame.K_m: 
                         self.menurun()
                         
-                    if event.key == pygame.K_e:
-                        for m in self.monstergroup:
-                            m.flee = not m.flee
+                    #if event.key == pygame.K_e:
+                    #    for m in self.monstergroup:
+                    #        m.flee = not m.flee
                     
                     if event.key==pygame.K_1:
                         self.player1.firemode="single"
@@ -1234,28 +1238,45 @@ class Viewer(object):
                             Mine(pos=pygame.math.Vector2(self.player2.pos.x, self.player2.pos.y),bossnumber=self.player2.number)
                             self.player2.mines-=1
                             
-                    if event.key == pygame.K_CAPSLOCK:
-                        self.player1.lockdown()
+                    for c in self.cheatsgroup:   
+                        if event.key == pygame.K_t:
+                            c.a=True
+                        if event.key == pygame.K_l and c.a == True:
+                            c.b=True
+                        if event.key == pygame.K_j and c.b == True:
+                            c.c=True
+                        if event.key == pygame.K_k and c.c == True:
+                            c.d=True
+                            for p in self.playergroup:
+                                p.hitpoints = 1000
+                                p.hitpointsfull = 1000
+                                p.speed = 30
+                                p.shots_per_single_shot=100
+                                p.mass = 50000
+            
+                            
+                    #if event.key == pygame.K_CAPSLOCK:
+                    #    self.player1.lockdown()
                         #print("mine at ", self.player1.pos)
                     # Viewer.width/2, Viewer.height/2,  "set_angle: 135°", color=(255,0,0), duration = 3, fontsize=20)
                     # ---- stop movement for self.player1 -----
-                    if event.key == pygame.K_r:
-                        self.player1.move *= 0.1 # remove 90% of movement
-                    if event.key == pygame.K_t:
-                        self.player2.move *= 0.1
-                    if event.key == pygame.K_f:
-                        self.player1.move *= 0.1
-                        self.player2.move *= 0.1
-                    if event.key == pygame.K_g:
-                        self.player1.move *=0
-                    if event.key == pygame.K_j:
-                        self.player2.move *=0
-                    if event.key == pygame.K_h:
-                        self.player1.move *=0
-                        self.player2.move *=0
+                    #if event.key == pygame.K_r:
+                    #    self.player1.move *= 0.1 # remove 90% of movement
+                    #if event.key == pygame.K_t:
+                    #    self.player2.move *= 0.1
+                    #if event.key == pygame.K_f:
+                    #    self.player1.move *= 0.1
+                    #    self.player2.move *= 0.1
+                    #if event.key == pygame.K_g:
+                    #    self.player1.move *=0
+                    #if event.key == pygame.K_j:
+                    #    self.player2.move *=0
+                    #if event.key == pygame.K_h:
+                    #    self.player1.move *=0
+                    #    self.player2.move *=0
                     
-                    if event.key == pygame.K_F1:
-                        Astromech(pos=pygame.math.Vector2(200,-400))
+                    #if event.key == pygame.K_F1:
+                    #    Astromech(pos=pygame.math.Vector2(200,-400))
    
             # delete everything on screen
             self.screen.blit(self.background, (0, 0))
@@ -1298,7 +1319,7 @@ class Viewer(object):
             if pressed_keys[pygame.K_RIGHT]:
                 self.player2.rotate(-(self.player2.sensitivity))
             if pressed_keys[pygame.K_UP]:
-                v = pygame.math.Vector2(1,0)
+                v = pygame.math.Vector2(self.player2.speed,0)
                 v.rotate_ip(self.player2.angle)
                 self.player2.move += v
                 Smoke(pos=self.player2.pos)
@@ -1313,12 +1334,12 @@ class Viewer(object):
                 self.player2.fire()
                 
                 
-            if pressed_keys[pygame.K_q] and self.player1.invisibility == True:
-                if self.player1.color == (0,0,255):
-                    self.player1.color = (240,240,240)
-                elif self.player1.color == (240,240,240):
-                    self.player1.color = (0,0,255)
-                self.player1.create_image()
+            #if pressed_keys[pygame.K_q] and self.player1.invisibility == True:
+            #    if self.player1.color == (0,0,255):
+            #        self.player1.color = (240,240,240)
+            #    elif self.player1.color == (240,240,240):
+            #        self.player1.color = (0,0,255)
+            #    self.player1.create_image()
             
           
                 
@@ -1523,8 +1544,6 @@ class Viewer(object):
         #-----------------------------------------------------
         pygame.mouse.set_visible(True)    
         pygame.quit()
-
-
     def menurun(self):
         """The mainloop"""
         running = True
@@ -1728,6 +1747,7 @@ class Viewer(object):
                          Flytext(500,400,"1 missile purchased")
                      else:
                          Flytext(500,400,"not enough money")
+                         
                  elif t == "sniper":
                      price = 1
                      if self.activeplayer.points >= price:
@@ -1774,7 +1794,15 @@ class Viewer(object):
                          Flytext(500,400, "level {} rammer equiped".format(self.activeplayer.rammer))
                      else:
                          Flytext(500, 400, "not enough money")
- 
+                 
+                 elif t == "astromech":
+                     price = 1
+                     if self.activeplayer.points >= price:
+                         self.activeplayer.points -= price
+                         Astromech(bossnumber = self.activeplayer.number)
+                         Flytext(500, 400, "Astromech purchased")
+                     else:
+                         Flytext(500,400, "not enough money")
             #    self.launchRocket(pygame.mouse.get_pos())
             #if right:
             #    self.launchRocket(pygame.mouse.get_pos())
@@ -1783,7 +1811,5 @@ class Viewer(object):
             pygame.display.flip()
         # bye bye menu
         pygame.mouse.set_visible(False)    
-
-
 if __name__ == '__main__':
     Viewer(1430,800).run() # try Viewer(800,600).run()
