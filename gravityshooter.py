@@ -1,23 +1,15 @@
 """
-author: Horst JENS
-email: horstjens@gmail.com
-contact: see http://spielend-programmieren.at/de:kontakt
-license: gpl, see http://www.gnu.org/licenses/gpl-3.0.de.html
-download: 
+author: Samuel Wetter
+email: samuel.wetterqgmail.com
+download: https://github.com/Carb0nbas3d/learning-python/blob/master/gravityshooter.py
 idea: clean python3/pygame template using pygame.math.vector2
 
 """
 import pygame
-#import math
 import random
 import os
 import time
-#import operator
 import math
-#import vectorclass2d as v
-#import textscroller_vertical as ts
-#import subprocess
-#remember700
 
 """Best game: 10 waves by Ines"""
 
@@ -360,7 +352,6 @@ class VectorSprite(pygame.sprite.Sprite):
                     self.kill()
             if self.sticky_with_boss:
                 boss = VectorSprite.numbers[self.bossnumber]
-                #self.pos = v.Vec2d(boss.pos.x, boss.pos.y)
                 self.pos = pygame.math.Vector2(boss.pos.x, boss.pos.y)
         self.pos += self.move * seconds
         self.distance_traveled += self.move.length() * seconds
@@ -414,7 +405,7 @@ class Player(VectorSprite):
         self.mass =1000
         self.points =0
         self.mines = 10
-        self.firemode = "single" #"shotgun" "machine gun"
+        self.firemode = "single"
         self.shotgunangle = 30
         self.effect_shots_per_shotgun = 0
         self.effect_shots_per_single_shot = 1
@@ -496,7 +487,6 @@ class Player(VectorSprite):
         elif self.firemode == "machine gun":
             # overheating?
             if self.age < self.triggerhappytime:
-                #print(" gun to hot, sorry")
                 return
             
             self.heat += 2
@@ -545,11 +535,11 @@ class Player(VectorSprite):
                 self.target_number = self.closest.number
                 self.target = self.closest
         # rotate towards target
-           # lebt target noch?
+           # is target still alive?
         if self.target_number not in VectorSprite.numbers:
             self.target_selection()
             return
-        # diffvector zum target
+        # diffvector to target
         diff =  self.target.pos - self.pos
         try:
             diff.normalize_ip() # make length 1
@@ -558,16 +548,6 @@ class Player(VectorSprite):
         diff *= self.speed
         rv = pygame.math.Vector2(1,0)
         a1 = -diff.angle_to(rv)
-        # a1 ist winkel zum target
-        # 0.5 ist die toleranz beim zielen
-        #if self.angle < a1 - 0.5 :
-        #    delta = self.rotation_speed * seconds
-        #elif self.angle > a1 + 0.5 :
-        #    delta = - self.rotation_speed * seconds
-        #else:
-        #    delta = 0
-        #self.move.rotate_ip(a1)
-        #self.rotate(delta)
         self.set_angle(a1)
         
 class Astromech(VectorSprite):
@@ -653,7 +633,6 @@ class EvilMonster(VectorSprite):
                 self.move += v
             return
         # select target to move to
-        #t = random.choice(targets)
         # calculate closest distance
         self.closest = None
         bestdist = None
@@ -745,11 +724,10 @@ class Mine(VectorSprite):
     
     def create_image(self):
         self.image = pygame.Surface((20,20))
-        # umfang 
+        # circumference 
         pygame.draw.circle(self.image, (1,1,1), (10,10), 10)
-        # auge
+        # eye
         pygame.draw.circle(self.image, (self.red, 0, 0), (10,10), 5)
-        #pygame.draw.circle(self.image, (self.red, 0, 0), (40,10), 10)
         self.image.set_colorkey((0,0,0))
         self.image.convert_alpha()
         self.rect = self.image.get_rect()
@@ -821,8 +799,6 @@ class Smoke(VectorSprite):
 
     def update(self, seconds):
         VectorSprite.update(self, seconds)
-        #if self.gravity is not None:
-         #   self.move += self.gravity * seconds
         self.create_image()
         self.rect=self.image.get_rect()
         self.rect.center=(self.pos.x, -self.pos.y)
@@ -842,9 +818,6 @@ class Game():
     optionmenu = ["back","resolution","mouse sensitivity"]
     sensmenu = ["back","very low","low","normal","high","very high","super high","mega high"]
     resmenu=[]
-    #menu =  { "upgrade": ["upgrade rockets", "upgbrade shield", "...."],
-            #   "downgrade": [ ... ] ,
-             # }
     
     
 class Explosion():
@@ -889,7 +862,6 @@ class Missile(VectorSprite):
         self.angle = boss.angle
         self.speed = 3
         self.top_speed = 200
-        #self.acc = 
         self.rotation_speed = 35 # grad per second
         self.target_selection()
         self.warp_on_edge = True
@@ -903,11 +875,11 @@ class Missile(VectorSprite):
         self.rect = self.image.get_rect()
 
     def update(self, seconds):
-        # lebt target noch?
+        # is target still alive?
         if self.target_number not in VectorSprite.numbers:
             self.target_selection()
             return
-        # diffvector zum target
+        # diffvector to target
         diff =  self.target.pos - self.pos
         try:
             diff.normalize_ip() # make length 1
@@ -916,8 +888,6 @@ class Missile(VectorSprite):
         diff *= self.speed
         rv = pygame.math.Vector2(1,0)
         a1 = -diff.angle_to(rv)
-        # a1 ist winkel zum target
-        # 0.5 ist die toleranz beim zielen
         if self.angle < a1 - 0.5 :
             delta = self.rotation_speed * seconds
         elif self.angle > a1 + 0.5 :
@@ -934,12 +904,9 @@ class Missile(VectorSprite):
             m = pygame.math.Vector2(1,0)
             m.rotate_ip(self.angle)
             self.move = m 
-        #self.move *= 1.15 # % schneller (wert muss über 1 sein, zb 1.01)
         if self.move.length() > self.top_speed:
-            self.move.normalize_ip() # hat länge 1
+            self.move.normalize_ip()
             self.move *= self.top_speed   
-        #self.set_angle(a)
-        #self.move = diff
         VectorSprite.update(self, seconds)
         # ---- smoking ---
         Smoke(pos=pygame.math.Vector2(self.pos.x, self.pos.y))
@@ -1016,10 +983,6 @@ class Viewer(object):
         
         print(self.backgroundfilenames)
             
-        #if len(self.backgroundfilenames) == 0:
-        #    print("Error: no .jpg files found")
-        #    pygame.quit
-        #    sys.exit()
         Viewer.bombchance = 0.015
         Viewer.rocketchance = 0.001
         Viewer.wave = 0
@@ -1072,9 +1035,6 @@ class Viewer(object):
     def paint(self):
         """painting on the surface and create sprites"""
         self.allgroup =  pygame.sprite.LayeredUpdates() # for drawing
-        #self.tracergroup = pygame.sprite.Group()
-        #self.mousegroup = pygame.sprite.Group()
-        #self.explosiongroup = pygame.sprite.Group()
         self.monstergroup = pygame.sprite.Group()
         self.rocketgroup = pygame.sprite.Group()
         self.playergroup = pygame.sprite.Group()
@@ -1088,26 +1048,16 @@ class Viewer(object):
         
         EvilMonster.groups = self.allgroup
         Player.groups = self.allgroup, self.playergroup
-        #Mouse.groups = self.allgroup, self.mousegroup
         Mine.groups= self.allgroup, self.minegroup
         VectorSprite.groups = self.allgroup
         Flytext.groups = self.allgroup, self.flytextgroup
-        #Explosion.groups= self.allgroup, self.explosiongroup
         Rocket.groups= self.allgroup, self.rocketgroup
         EvilMonster.groups= self.allgroup, self.monstergroup
         Fireball.groups= self.allgroup, self.fireballgroup
         Powerup.groups= self.allgroup, self.powerupgroup
         Missile.groups= self.allgroup, self.missilegroup
         Astromech.groups= self.allgroup, self.astromechgroup
-        #Cheats.groups = self.allgroup, self.cheatsgroup
-   
-        # ------ player1,2,3: mouse, keyboard, joystick ---
-        #self.mouse1 = Mouse(control="mouse", color=(255,0,0))
-        #self.mouse2 = Mouse(control='keyboard1', color=(255,255,0))
-        #self.mouse3 = Mouse(control="keyboard2", color=(255,0,255))
-        #self.mouse4 = Mouse(control="joystick1", color=(255,128,255))
-        #self.mouse5 = Mouse(control="joystick2", color=(255,255,255))
-
+        
         self.player1 =  Player(warp_on_edge=True, pos=pygame.math.Vector2(Viewer.width/2,-Viewer.height/2))
         
         self.player2 =  Player(warp_on_edge=True, pos=pygame.math.Vector2(Viewer.width/2+100,-Viewer.height/2))
@@ -1116,9 +1066,7 @@ class Viewer(object):
         
         self.generate_enemies()
         
-        #for x in range(30):
-        #    EvilMonster( bounce_on_edge=True)
-
+        
         
     def movement_indicator(self,vehicle,pygamepos, color=(0,200,0)):
         #----heading indicator
@@ -1152,8 +1100,10 @@ class Viewer(object):
         self.snipertarget = None
         gameOver = False
         exittime = 0
-        self
-        #self.levelcleared = False
+        self.cheating = False
+        #self.cheatcode= "teotenegkv"
+        self.cheatcode = [ pygame.K_t, pygame.K_e, pygame.K_o, pygame.K_t, pygame.K_e, pygame.K_n, pygame.K_e, pygame.K_g, pygame.K_k, pygame.K_v]
+        self.cheatindex=0
         
        
         
@@ -1164,24 +1114,34 @@ class Viewer(object):
             if gameOver:
                 if self.playtime > exittime:
                     break
-            #Game over?
-            #if not gameOver:
             # -------- events ------
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 # ------- pressed and released key ------
                 elif event.type == pygame.KEYDOWN:
+                    # ---- cheat ----
+                    if not self.cheating and  event.key == self.cheatcode[self.cheatindex]:
+                        self.cheatindex += 1
+                        if self.cheatindex ==10:
+                            self.cheating = True
+                            if self.cheating == True:
+                                for p in self.playergroup:
+                                    p.hitpoints = 1000
+                                    p.hitpointsfull = 1000
+                                    p.mines = 1000
+                                    p.speed = 20
+                                    p.effect_shots_per_single_shot=50
+                                    p.effect_shots_per_shotgun=720
+                                    p.shotgunangle=360
+                                    p.cool=100
+                                    p.points=1000000    
                     if event.key == pygame.K_ESCAPE:
                         running = False
                    
                     if event.key==pygame.K_m: 
                         self.menurun()
-                        
-                    #if event.key == pygame.K_e:
-                    #    for m in self.monstergroup:
-                    #        m.flee = not m.flee
-                    
+                                            
                     if event.key==pygame.K_1:
                         self.player1.firemode="single"
                         Flytext(500,400,"p1 single")
@@ -1253,31 +1213,7 @@ class Viewer(object):
                                 p.speed = 30
                                 p.shots_per_single_shot=100
                                 p.mass = 50000
-            
-                            
-                    #if event.key == pygame.K_CAPSLOCK:
-                    #    self.player1.lockdown()
-                        #print("mine at ", self.player1.pos)
-                    # Viewer.width/2, Viewer.height/2,  "set_angle: 135°", color=(255,0,0), duration = 3, fontsize=20)
-                    # ---- stop movement for self.player1 -----
-                    #if event.key == pygame.K_r:
-                    #    self.player1.move *= 0.1 # remove 90% of movement
-                    #if event.key == pygame.K_t:
-                    #    self.player2.move *= 0.1
-                    #if event.key == pygame.K_f:
-                    #    self.player1.move *= 0.1
-                    #    self.player2.move *= 0.1
-                    #if event.key == pygame.K_g:
-                    #    self.player1.move *=0
-                    #if event.key == pygame.K_j:
-                    #    self.player2.move *=0
-                    #if event.key == pygame.K_h:
-                    #    self.player1.move *=0
-                    #    self.player2.move *=0
-                    
-                    #if event.key == pygame.K_F1:
-                    #    Astromech(pos=pygame.math.Vector2(200,-400))
-   
+               
             # delete everything on screen
             self.screen.blit(self.background, (0, 0))
             
@@ -1291,9 +1227,7 @@ class Viewer(object):
                 # flytext?
                 self.next_wave()
                 
-            # --- line from eck to mouse ---
-            #pygame.draw.line(self.screen, (random.randint(200,250),0,0), (self.player1.pos.x, -self.player1.pos.y), (self.mouse1.x, self.mouse1.y))
-
+            
             # ------------ pressed keys ------
             pressed_keys = pygame.key.get_pressed()
             
@@ -1332,38 +1266,7 @@ class Viewer(object):
                 self.player1.fire()
             if pressed_keys[pygame.K_SPACE] and self.player2.firemode == "machine gun" :
                 self.player2.fire()
-                
-                
-            #if pressed_keys[pygame.K_q] and self.player1.invisibility == True:
-            #    if self.player1.color == (0,0,255):
-            #        self.player1.color = (240,240,240)
-            #    elif self.player1.color == (240,240,240):
-            #        self.player1.color = (0,0,255)
-            #    self.player1.create_image()
-            
-          
-                
-            # ------ mouse handler ------
-            #left,middle,right = pygame.mouse.get_pressed()
-            #if oldleft and not left:
-            #    self.launchRocket(pygame.mouse.get_pos())
-            #if right:
-            #    self.launchRocket(pygame.mouse.get_pos())
-            #oldleft, oldmiddle, oldright = left, middle, right
-
-            # ------ joystick handler -------
-                       #if b == 0 and pushed:
-                       #        self.launchRocket((mouses[number].x, mouses[number].y))
-                       #elif b == 1 and pushed:
-                       #    if not self.mouse4.pushed: 
-                       #        self.launchRocket((mouses[number].x, mouses[number].y))
-                       #        mouses[number] = True
-                       #elif b == 1 and not pushed:
-                       #    mouses[number] = False
-            #pos1 = pygame.math.Vector2(pygame.mouse.get_pos())
-            #pos2 = self.mouse2.rect.center
-            #pos3 = self.mouse3.rect.center
-            
+               
             # write text below sprites
             write(self.screen, "FPS: {:8.3}".format(
                 self.clock.get_fps() ), x=10, y=10)
@@ -1464,9 +1367,8 @@ class Viewer(object):
                 for mo in crashgroup:
                     diffvector = mo.pos - mi.pos
                     diffvector.normalize_ip()
-                    #print("diffvec", diffvector)
                     mo.move = diffvector * 100
-                    Fireball(pos=mi.pos, bossnumber=mi.bossnumber)####
+                    Fireball(pos=mi.pos, bossnumber=mi.bossnumber)
                     mi.kill()
                     self.loadbackground()
             #-----------collision detection between monster and fireball-----
@@ -1490,7 +1392,6 @@ class Viewer(object):
                 for m in crashgroup:
                     a.hitpoints-=1
                 
-                    #print("monsterdamage",m.number,m.hitpoints)
             #----------collision detection between player and powerup----
             for pl in self.playergroup:
                 crashgroup=pygame.sprite.spritecollide(pl, self.powerupgroup,
@@ -1501,17 +1402,7 @@ class Viewer(object):
                     pl.hitpoints += 25
                     if pl.hitpoints > pl.hitpointsfull:
                         pl.hitpointsfull += 25
-            #--------------pvp-------
-            #-----------issue-collision effects self
-            #for p in self.playergroup:
-             #   crashgroup = pygame.sprite.spritecollide(p, self.rocketgroup,
-               #              False, pygame.sprite.collide_mask)
-              #  for r in crashgroup:
-                #    p.hitpoints -= r.damage
-                 #   elastic_collision(p,r)
-                  #  Explosion(pos=r.pos, max_age=0.25)
-                   # r.kill()
-                    
+        
             # ----------- clear, draw , update, flip -----------------
             self.allgroup.draw(self.screen)
             
@@ -1529,16 +1420,7 @@ class Viewer(object):
 
             self.movement_indicator(self.player1,(105,105))
             self.movement_indicator(self.player2,(1320,105))
-            
-            # --- Martins verbesserter Mousetail -----
-            #for mouse in self.mousegroup:
-             #   if len(mouse.tail)>2:
-              #      for a in range(1,len(mouse.tail)):
-               #         r,g,b = mouse.color
-                #        pygame.draw.line(self.screen,(r-a,g,b),
-                                     #mouse.tail[a-1],
-                                     #mouse.tail[a],10-a*10//10)
-            
+                        
             # -------- next frame -------------
             pygame.display.flip()
         #-----------------------------------------------------
@@ -1598,7 +1480,7 @@ class Viewer(object):
             elif y < 775 and items > 13:
                 Game.menuindex = 13
             elif y < 825 and items > 14:
-                Game.menuindex = 14#F0F0F0
+                Game.menuindex = 14
             elif y < 875 and items > 15:
                 Game.menuindex = 15
             elif y < 925 and items > 16:
@@ -1624,8 +1506,6 @@ class Viewer(object):
             left,middle,right = pygame.mouse.get_pressed()
             if oldleft and not left:
                  t=Game.menuitems[Game.menuindex]
-                 #Flytext(x=600,y=400, text=t)
-                 #auswertung nach linksklick
                  if t == "exit":
                      return
                  elif t == "upgrade player1":
@@ -1674,7 +1554,6 @@ class Viewer(object):
                      for p in self.playergroup:
                          p.sensitivity = 12
                  
-                 #---auswertung upgrade------
                  elif Game.menuitems == Game.resmenu:
                      resstring = t
                      xpos = resstring.find("x")
@@ -1803,13 +1682,9 @@ class Viewer(object):
                          Flytext(500, 400, "Astromech purchased")
                      else:
                          Flytext(500,400, "not enough money")
-            #    self.launchRocket(pygame.mouse.get_pos())
-            #if right:
-            #    self.launchRocket(pygame.mouse.get_pos())
             oldleft, oldmiddle, oldright = left, middle, right
             # -------- next frame -------------
             pygame.display.flip()
-        # bye bye menu
         pygame.mouse.set_visible(False)    
 if __name__ == '__main__':
-    Viewer(1430,800).run() # try Viewer(800,600).run()
+    Viewer(1430,800).run()
